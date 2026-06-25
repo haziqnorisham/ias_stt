@@ -1,0 +1,48 @@
+body {
+  background-color: #f5f6f8;
+}
+
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+th.sortable:hover {
+  background-color: #e9ecef;
+}
+
+th.sortable::after {
+  content: "\2195";
+  opacity: 0.3;
+  margin-left: 0.35rem;
+  font-size: 0.8em;
+}
+
+th.sortable.sort-asc::after {
+  content: "\2191";
+  opacity: 0.9;
+}
+
+th.sortable.sort-desc::after {
+  content: "\2193";
+  opacity: 0.9;
+}
+
+#trapsBody td {
+  vertical-align: middle;
+}
+
+.timestamp {
+  font-size: 0.8rem;
+  color: #6c757d;
+  white-space: nowrap;
+}
+
+.actions-cell .btn {
+  padding: 0.1rem 0.4rem;
+}
+
+.toast-container {
+  z-index: 1080;
+}
