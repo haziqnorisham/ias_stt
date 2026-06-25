@@ -12,6 +12,11 @@ def hello_world():
     return "Hello World"
 
 
+@api_bp.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok"}), 200
+
+
 @api_bp.route("/api/auth/verify", methods=["GET"])
 @require_api_key
 def verify():

@@ -320,6 +320,52 @@ hardcoded anywhere in the source.
   if a cross-origin client (e.g. Grafana) needs API access.
 - Run a dependency vulnerability scan before each release: `pip-audit`.
 
+## Docker deployment
+
+A multi-stage `Dockerfile`, `uwsgi.ini`, and `docker-compose.yml` are included
+for production-style deployment.
+
+**Quick start**
+
+```bash
+# Ensure a .env file exists (copy from the example if you haven't already)
+cp .env.example .env    # then edit with your broker, API key, etc.
+
+docker-compose build
+docker-compose up -d
+```
+
+The app is available at `http://localhost:${FLASK_PORT:-5000}`. The SQLite
+database file (`data/traps.db`) is mounted as a volume and survives restarts.
+
+**Other commands**
+
+```bash
+docker-compose logs -f          # follow logs
+docker-compose down             # stop
+docker-compose up -d --build    # rebuild and restart
+```
+
+**What's inside**
+
+| Layer    | Detail                                                |
+| -------- | ----------------------------------------------------- |
+| Base     | `python:3.11-slim`                                    |
+| Server   | **uWSGI** (compiled in a builder stage → slim runtime)|
+| User     | `appuser` (non-root)                                  |
+| Config   | `.env` via `env_file` + `environment` overrides        |
+| Health   | `curl /api/health` every 30 s                         |
+| Workers  | `UWSGI_PROCESSES` (default 2) × `UWSGI_THREADS` (2)   |
+| Port     | `FLASK_PORT` (default 5000)                            |
+
+**Production notes**
+
+- `FLASK_ENV` is set to `production` → debug/reloader are **off**.
+- Set a strong `API_KEY` and real MQTT broker details in your `.env`.
+- The `.env` file must contain at least the variables listed in
+  [Configuration](#configuration) — the app will warn but start gracefully for
+  optional values (e.g. missing MQTT broker).
+
 ## Roadmap
 
 - **Done:** Flask scaffolding, MQTT monitoring, SQLite trap CRUD API, web UI,
