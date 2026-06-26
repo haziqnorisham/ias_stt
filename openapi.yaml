@@ -1,0 +1,675 @@
+openapi: 3.0.3
+info:
+  title: ias_stt — Trap Management API
+  version: 1.0.0
+  description: |
+    MQTT-backed trap management service with deployment tracking,
+    location history, and photo upload. All `/api/*` endpoints
+    require a Bearer token (`API_KEY` from the environment).
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Health
+    description: Public service health checks
+  - name: Auth
+    description: API key verification
+  - name: Traps
+    description: Trap device CRUD
+  - name: Deployments
+    description: Deployment tracking and location history
+
+# ===========================================================================
+# Paths
+# ===========================================================================
+paths:
+  # -- Public ----------------------------------------------------------------
+  /:
+    get:
+      tags: [Health]
+      summary: Hello World
+      operationId: helloWorld
+      security: []
+      responses:
+        200:
+          description: Plain-text greeting
+          content:
+            text/plain:
+              example: Hello World
+
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Service health check
+      operationId: health
+      security: []
+      responses:
+        200:
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: ok
+
+  # -- Auth ------------------------------------------------------------------
+  /api/auth/verify:
+    get:
+      tags: [Auth]
+      summary: Verify API key
+      operationId: verifyApiKey
+      responses:
+        200:
+          description: Key is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+              example:
+                ok: true
+        401:
+          $ref: '#/components/responses/401'
+
+  # -- Traps -----------------------------------------------------------------
+  /api/traps:
+    get:
+      tags: [Traps]
+      summary: List traps
+      operationId: listTraps
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, inactive] }
+          description: Filter by trap status
+      responses:
+        200:
+          description: A JSON array of traps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Trap'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+
+    post:
+      tags: [Traps]
+      summary: Create a trap
+      operationId: createTrap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrapCreate'
+            example:
+              status: active
+              trap_id: TRAP-001
+              tracker_id: TRK-001
+              location: north
+              temperature: 23.5
+              updated_by: alice
+      responses:
+        201:
+          description: Trap created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trap'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        409:
+          $ref: '#/components/responses/409'
+
+  /api/traps/{trap_id}:
+    parameters:
+      - name: trap_id
+        in: path
+        required: true
+        schema: { type: integer }
+        description: Trap primary key ID
+
+    get:
+      tags: [Traps]
+      summary: Get a trap by ID
+      operationId: getTrap
+      responses:
+        200:
+          description: Trap found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trap'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+    put:
+      tags: [Traps]
+      summary: Update a trap
+      description: |
+        Requires `updated_by`. Status changes trigger automatic
+        deployment create/close; location changes record location
+        history under the active deployment.
+      operationId: updateTrap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrapUpdate'
+            example:
+              status: inactive
+              location: east
+              updated_by: alice
+      responses:
+        200:
+          description: Trap updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trap'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+        409:
+          $ref: '#/components/responses/409'
+
+    delete:
+      tags: [Traps]
+      summary: Delete a trap
+      operationId: deleteTrap
+      responses:
+        200:
+          description: Trap deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+              example:
+                message: Trap 1 deleted
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  # -- Deployments -----------------------------------------------------------
+  /api/deployments:
+    get:
+      tags: [Deployments]
+      summary: List deployments
+      operationId: listDeployments
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+        - name: trap_id
+          in: query
+          schema: { type: integer }
+          description: Filter by trap ID
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, closed] }
+          description: Filter by deployment status
+      responses:
+        200:
+          description: A JSON array of deployments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Deployment'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+
+    post:
+      tags: [Deployments]
+      summary: Manually create a deployment
+      operationId: createDeployment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeploymentCreate'
+            example:
+              trap_id: 1
+              location: north
+              notes: Initial placement
+      responses:
+        201:
+          description: Deployment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  /api/deployments/{deployment_id}:
+    parameters:
+      - name: deployment_id
+        in: path
+        required: true
+        schema: { type: integer }
+        description: Deployment primary key ID
+
+    get:
+      tags: [Deployments]
+      summary: Get a deployment by ID
+      operationId: getDeployment
+      responses:
+        200:
+          description: Deployment found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+    put:
+      tags: [Deployments]
+      summary: Update deployment details
+      operationId: updateDeployment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeploymentUpdate'
+            example:
+              animal_capture: 2 rats
+              notes: Updated notes
+      responses:
+        200:
+          description: Deployment updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+    delete:
+      tags: [Deployments]
+      summary: Delete a deployment
+      operationId: deleteDeployment
+      responses:
+        200:
+          description: Deployment deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+              example:
+                message: Deployment 1 deleted
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  /api/deployments/{deployment_id}/photo:
+    parameters:
+      - name: deployment_id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Deployments]
+      summary: Upload a photo for a deployment
+      operationId: uploadPhoto
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (jpg, jpeg, png, gif)
+              required: [file]
+      responses:
+        200:
+          description: Photo uploaded; `photo_url` and `photo_filename` are set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  /api/deployments/{deployment_id}/locations:
+    parameters:
+      - name: deployment_id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Deployments]
+      summary: List location history for a deployment
+      operationId: deploymentLocations
+      responses:
+        200:
+          description: Location history array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeploymentLocation'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  /api/deployments/{deployment_id}/locations/latest:
+    parameters:
+      - name: deployment_id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Deployments]
+      summary: Get the most recent location for a deployment
+      operationId: deploymentLatestLocation
+      responses:
+        200:
+          description: Latest location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentLocation'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  # -- Trap-scoped nested ----------------------------------------------------
+  /api/traps/{trap_id}/deployments:
+    parameters:
+      - name: trap_id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Deployments]
+      summary: List all deployments for a trap
+      operationId: trapDeployments
+      responses:
+        200:
+          description: Deployments array (newest first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Deployment'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  /api/traps/{trap_id}/deployments/active:
+    parameters:
+      - name: trap_id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Deployments]
+      summary: Get the active deployment for a trap
+      operationId: trapActiveDeployment
+      responses:
+        200:
+          description: Active deployment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deployment'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  /api/traps/{trap_id}/locations:
+    parameters:
+      - name: trap_id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Deployments]
+      summary: List all location history across all deployments for a trap
+      operationId: trapLocations
+      responses:
+        200:
+          description: Location history array (newest first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeploymentLocation'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+# ===========================================================================
+# Components
+# ===========================================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Set the `API_KEY` environment variable on the server.
+        Pass it as: `Authorization: Bearer <your-api-key>`
+
+  # -- Reusable parameters ---------------------------------------------------
+  parameters:
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, default: 100, minimum: 0 }
+      description: Maximum items per page
+    offset:
+      name: offset
+      in: query
+      schema: { type: integer, default: 0, minimum: 0 }
+      description: Number of items to skip
+
+  # -- Schemas ---------------------------------------------------------------
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      example:
+        error: Invalid or missing API key
+
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+      example:
+        status: ok
+
+    Trap:
+      type: object
+      properties:
+        id:                { type: integer, readOnly: true }
+        status:            { type: string, enum: [active, inactive] }
+        trap_id:           { type: string, maxLength: 50 }
+        tracker_id:        { type: string, maxLength: 50 }
+        location:          { type: string, maxLength: 50, nullable: true }
+        door_status:       { type: string, maxLength: 20, nullable: true }
+        temperature:       { type: number, format: float, nullable: true }
+        notes:             { type: string, maxLength: 255, nullable: true }
+        updated_by:        { type: string, maxLength: 50 }
+        created_at:        { type: string, format: date-time, readOnly: true }
+        updated_at:        { type: string, format: date-time, readOnly: true }
+      required:
+        - status
+        - trap_id
+        - tracker_id
+
+    TrapCreate:
+      type: object
+      properties:
+        status:            { type: string, enum: [active, inactive] }
+        trap_id:           { type: string, maxLength: 50 }
+        tracker_id:        { type: string, maxLength: 50 }
+        location:          { type: string, maxLength: 50 }
+        door_status:       { type: string, maxLength: 20 }
+        temperature:       { type: number, format: float }
+        notes:             { type: string, maxLength: 255 }
+        updated_by:        { type: string, maxLength: 50 }
+      required: [status, trap_id, tracker_id]
+
+    TrapUpdate:
+      type: object
+      properties:
+        status:            { type: string, enum: [active, inactive] }
+        trap_id:           { type: string, maxLength: 50 }
+        tracker_id:        { type: string, maxLength: 50 }
+        location:          { type: string, maxLength: 50 }
+        door_status:       { type: string, maxLength: 20 }
+        temperature:       { type: number, format: float }
+        notes:             { type: string, maxLength: 255 }
+        updated_by:        { type: string, maxLength: 50 }
+      required: [updated_by]
+
+    Deployment:
+      type: object
+      properties:
+        id:                { type: integer, readOnly: true }
+        trap_id:           { type: integer }
+        status:            { type: string, enum: [active, closed] }
+        start_date:        { type: string, format: date-time }
+        end_date:          { type: string, format: date-time, nullable: true }
+        animal_capture:    { type: string, maxLength: 255, nullable: true }
+        photo_url:         { type: string, maxLength: 500, nullable: true }
+        photo_filename:    { type: string, maxLength: 255, nullable: true }
+        notes:             { type: string, maxLength: 500, nullable: true }
+        created_at:        { type: string, format: date-time, readOnly: true }
+        updated_at:        { type: string, format: date-time, readOnly: true }
+
+    DeploymentCreate:
+      type: object
+      properties:
+        trap_id:           { type: integer }
+        location:          { type: string, maxLength: 50 }
+        notes:             { type: string, maxLength: 500 }
+      required: [trap_id]
+
+    DeploymentUpdate:
+      type: object
+      properties:
+        animal_capture:    { type: string, maxLength: 255 }
+        notes:             { type: string, maxLength: 500 }
+
+    DeploymentLocation:
+      type: object
+      properties:
+        id:                { type: integer, readOnly: true }
+        deployment_id:     { type: integer, readOnly: true }
+        location:          { type: string, maxLength: 50 }
+        recorded_at:       { type: string, format: date-time }
+        notes:             { type: string, maxLength: 255, nullable: true }
+        created_at:        { type: string, format: date-time, readOnly: true }
+
+  # -- Reusable responses ----------------------------------------------------
+  responses:
+    400:
+      description: Bad request — missing or invalid fields
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missingField:
+              summary: Missing required field
+              value: { error: "Missing required field(s): status" }
+            invalidType:
+              summary: Invalid limit/offset
+              value: { error: "'limit' and 'offset' must be integers" }
+    401:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Invalid or missing API key
+    404:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Trap not found
+    409:
+      description: Conflict — duplicate trap_id
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: trap_id 'TRAP-001' already exists
+    500:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Internal Server Error

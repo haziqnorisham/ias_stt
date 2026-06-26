@@ -74,6 +74,17 @@ curl http://localhost:5000/
 # -> Hello World
 ```
 
+## API documentation (OpenAPI)
+
+An `openapi.yaml` specification is included in the project root covering all
+19 endpoints, data models, and authentication. Import it into **Bruno**:
+
+1. Open Bruno → *Collections* → *Import Collection*
+2. Choose **OpenAPI v3** → select `openapi.yaml`
+3. Set the collection-level auth header: `Authorization: Bearer <API_KEY>`
+
+You can also browse it with any OpenAPI viewer (Swagger UI, Redoc, etc.).
+
 ## Configuration
 
 Config is read from environment variables (see `.env.example`).
