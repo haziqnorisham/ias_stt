@@ -156,7 +156,6 @@ class MQTTService:
         logger.debug("paho: %s", buf)
 
     def on_message(self, client, userdata, msg):
-        """Phase 2: print received messages to the console."""
         try:
             raw = msg.payload
             try:
@@ -164,18 +163,9 @@ class MQTTService:
             except (UnicodeDecodeError, AttributeError):
                 decoded = repr(raw)
 
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            logger.info(
-                "\n%s\n\U0001F4E8 MQTT Message Received\n"
-                "Topic: %s\nQoS: %s | Retain: %s\nTimestamp: %s\nPayload: %s\n%s",
-                "=" * 59,
-                msg.topic,
-                msg.qos,
-                msg.retain,
-                timestamp,
-                decoded,
-                "-" * 59,
-            )
+            from app.services.data_processor import process_message
+
+            process_message(msg.topic, decoded)
         except Exception:
             logger.exception("Error while handling incoming MQTT message")
 
