@@ -4,7 +4,7 @@
 FROM python:3.11-slim AS builder
 
 RUN apt-get update -y \
-    && apt-get install -y --no-install-recommends gcc build-essential python3-dev libpcre3 libpcre3-dev\
+    && apt-get install -y --no-install-recommends gcc build-essential python3-dev libpcre3\
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -21,7 +21,7 @@ RUN python -m venv /app/venv \
 FROM python:3.11-slim
 
 RUN apt-get update -y \
-    && apt-get install -y --no-install-recommends curl gcc build-essential python3-dev libpcre3 libpcre3-dev\
+    && apt-get install -y --no-install-recommends curl gcc build-essential python3-dev libpcre3\
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
