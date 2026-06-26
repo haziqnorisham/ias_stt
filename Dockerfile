@@ -4,7 +4,7 @@
 FROM python:3.11-slim AS builder
 
 RUN apt-get update -y \
-    && apt-get install -y --no-install-recommends gcc python3-dev \
+    && apt-get install -y --no-install-recommends gcc build-essential python3-dev\
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
