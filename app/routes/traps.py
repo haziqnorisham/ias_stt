@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.auth import require_api_key
 from app.models.database import db
 from app.models.trap import Trap
+from app.services import deployment_service
 
 traps_bp = Blueprint("traps", __name__, url_prefix="/api/traps")
 
@@ -162,9 +163,25 @@ def update_trap(trap_pk):
         if exists is not None:
             return _error(f"trap_id '{new_trap_id}' already exists", 409)
 
+    previous_status = trap.status
+    previous_location = trap.location
+
     err = _apply_fields(trap, data)
     if err:
         return _error(err, 400)
+
+    if previous_status != trap.status:
+        if previous_status == "inactive" and trap.status == "active":
+            deployment_service.create_deployment(
+                trap, location=trap.location
+            )
+        elif previous_status == "active" and trap.status == "inactive":
+            deployment_service.close_active_deployment(trap)
+
+    if previous_location != trap.location and trap.location:
+        deployment_service.record_location_change(
+            trap, trap.location
+        )
 
     try:
         db.session.commit()

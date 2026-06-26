@@ -3,6 +3,7 @@ venv/
 __pycache__/
 *.pyc
 *.pyo
+static/uploads/
 logs/
 data/
 *.db

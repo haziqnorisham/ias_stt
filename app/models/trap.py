@@ -60,3 +60,14 @@ class Trap(db.Model):
             .limit(1)
         )
         return db.session.execute(stmt).first() is not None
+
+    # ---- Deployment helpers ------------------------------------------------
+    deployments = db.relationship(
+        "Deployment",
+        backref="trap",
+        lazy="dynamic",
+    )
+
+    def get_active_deployment(self):
+        """Return the first active deployment for this trap, or None."""
+        return self.deployments.filter_by(status="active").first()

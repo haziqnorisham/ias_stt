@@ -171,6 +171,9 @@ function rowHtml(r) {
       <td class="timestamp">${fmtTs(r.created_at)}</td>
       <td class="timestamp">${fmtTs(r.updated_at)}</td>
       <td class="text-end actions-cell">
+        <button class="btn btn-sm btn-outline-info" onclick="event.stopPropagation();showDeployments(${r.id})" title="History">
+          <i class="bi bi-clock-history"></i>
+        </button>
         <button class="btn btn-sm btn-outline-primary" onclick="editTrap(${r.id})" title="Edit">
           <i class="bi bi-pencil"></i>
         </button>
@@ -256,7 +259,14 @@ async function submitForm(e) {
     return;
   }
   trapModal.hide();
-  toast(isEdit ? "Trap updated." : "Trap created.");
+  let msg = isEdit ? "Trap updated." : "Trap created.";
+  if (isEdit && payload.status && state.data.find(t => t.id === parseInt(pk))?.status !== payload.status) {
+    msg += " Deployment tracked.";
+  }
+  if (isEdit && payload.location && state.data.find(t => t.id === parseInt(pk))?.location !== payload.location) {
+    msg += " Location history recorded.";
+  }
+  toast(msg);
   await loadTraps();
 }
 
@@ -284,6 +294,87 @@ async function confirmDelete() {
 }
 
 // ----------------------------------------------------------------------------
+// Deployment history panel
+// ----------------------------------------------------------------------------
+window.showDeployments = async function (trapId) {
+  const trap = state.data.find((t) => t.id === trapId);
+  if (!trap) return;
+
+  const panel = document.getElementById("deploymentPanel");
+  const content = document.getElementById("depPanelContent");
+  document.getElementById("depTrapLabel").textContent =
+    `${trap.trap_id} (#${trapId})`;
+
+  content.innerHTML =
+    '<div class="text-muted text-center py-3">Loading…</div>';
+  panel.classList.remove("d-none");
+
+  const { ok: dOk, body: deps } = await api(
+    `/api/traps/${trapId}/deployments`
+  );
+  const { body: locs } = await api(`/api/traps/${trapId}/locations`);
+
+  const deployments = dOk ? deps : [];
+  const locations = Array.isArray(locs) ? locs : [];
+
+  const active = deployments.find((d) => d.status === "active");
+
+  let html = "";
+  if (active) {
+    html += `<div class="alert alert-success py-2 small mb-3">
+      <strong>Active deployment #${active.id}</strong> —
+      started ${fmtTs(active.start_date)}
+    </div>`;
+  } else {
+    html += `<div class="alert alert-secondary py-2 small mb-3">
+      No active deployment.
+    </div>`;
+  }
+
+  if (deployments.length) {
+    html += '<h6 class="small text-muted mb-2">Deployments</h6>';
+    html +=
+      '<table class="table table-sm table-borderless small"><thead><tr>' +
+      "<th>#</th><th>Status</th><th>Start</th><th>End</th><th>Capture</th></tr></thead><tbody>";
+    for (const d of deployments) {
+      html += `<tr>
+        <td>${d.id}</td>
+        <td>${d.status === "active"
+          ? '<span class="badge text-bg-success">active</span>'
+          : '<span class="badge text-bg-secondary">closed</span>'}
+        </td>
+        <td class="timestamp">${fmtTs(d.start_date)}</td>
+        <td class="timestamp">${fmtTs(d.end_date)}</td>
+        <td>${escapeHtml(d.animal_capture) || "—"}</td>
+      </tr>`;
+    }
+    html += "</tbody></table>";
+  }
+
+  if (locations.length) {
+    html += '<h6 class="small text-muted mb-2">Location history</h6>';
+    html +=
+      '<table class="table table-sm table-borderless small"><thead><tr>' +
+      "<th>Location</th><th>Deployment #</th><th>Recorded</th></tr></thead><tbody>";
+    for (const l of locations.slice(0, 20)) {
+      html += `<tr>
+        <td>${escapeHtml(l.location)}</td>
+        <td class="text-muted">#${l.deployment_id}</td>
+        <td class="timestamp">${fmtTs(l.recorded_at)}</td>
+      </tr>`;
+    }
+    html += "</tbody></table>";
+  }
+
+  if (!deployments.length && !locations.length) {
+    html +=
+      '<div class="text-muted text-center py-3">No deployment history yet.</div>';
+  }
+
+  content.innerHTML = html;
+};
+
+// ----------------------------------------------------------------------------
 // Wiring
 // ----------------------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
@@ -301,6 +392,9 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("trapForm").addEventListener("submit", submitForm);
   document.getElementById("confirmDeleteBtn").addEventListener("click", confirmDelete);
   document.getElementById("logoutBtn").addEventListener("click", logout);
+  document.getElementById("closeDepPanel").addEventListener("click", () => {
+    document.getElementById("deploymentPanel").classList.add("d-none");
+  });
 
   document.getElementById("searchInput").addEventListener("input", (e) => {
     state.search = e.target.value;

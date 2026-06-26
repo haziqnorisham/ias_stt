@@ -16,3 +16,13 @@ def traps_page():
 @frontend_bp.route("/login", methods=["GET"])
 def login_page():
     return render_template("login.html")
+
+
+@frontend_bp.route("/deployments", methods=["GET"])
+def deployments_page():
+    return render_template("deployments.html")
+
+
+@frontend_bp.route("/mobile", methods=["GET"])
+def mobile_page():
+    return render_template("mobile.html")
