@@ -18,6 +18,15 @@ def process_message(topic, payload):
             "Invalid JSON payload received on topic '%s': %s", topic, payload
         )
         return
+
+    dev_eui = data.get("deviceInfo", {}).get("devEui")
+    if dev_eui:
+        logger.info("deviceEui: %s", dev_eui)
+    else:
+        logger.warning(
+            "deviceEui not found in payload on topic '%s'", topic
+        )
+
     logger.info(
         "Topic: %s\nParsed JSON:\n%s", topic, json.dumps(data, indent=2)
     )
