@@ -5,6 +5,15 @@ import logging
 logger = logging.getLogger("app.data_processor")
 
 
+def device_exists(dev_eui):
+    """Check whether *dev_eui* is known in the traps tracker_id column.
+
+    Currently a stub — always returns True. Will be replaced with a database
+    query when the processing layer is wired to the traps table.
+    """
+    return True
+
+
 def process_message(topic, payload):
     """Single entry-point for every incoming MQTT message.
 
@@ -22,6 +31,8 @@ def process_message(topic, payload):
     dev_eui = data.get("deviceInfo", {}).get("devEui")
     if dev_eui:
         logger.info("deviceEui: %s", dev_eui)
+        known = device_exists(dev_eui)
+        logger.info("device_exists('%s') → %s", dev_eui, known)
     else:
         logger.warning(
             "deviceEui not found in payload on topic '%s'", topic
