@@ -1,4 +1,5 @@
 """MQTT message processing — currently log-only; hook for future logic."""
+import json
 import logging
 
 logger = logging.getLogger("app.data_processor")
@@ -7,8 +8,16 @@ logger = logging.getLogger("app.data_processor")
 def process_message(topic, payload):
     """Single entry-point for every incoming MQTT message.
 
-    For now the only behaviour is console logging. The *topic* and a decoded
-    string *payload* are expected, so the MQTT service handles raw→string
-    conversion before calling this method.
+    Attempts to parse *payload* as JSON. Valid JSON is pretty-printed at INFO
+    level; invalid payloads are logged at ERROR level and discarded.
     """
-    logger.info("Topic: %s\nPayload: %s", topic, payload)
+    try:
+        data = json.loads(payload)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        logger.error(
+            "Invalid JSON payload received on topic '%s': %s", topic, payload
+        )
+        return
+    logger.info(
+        "Topic: %s\nParsed JSON:\n%s", topic, json.dumps(data, indent=2)
+    )
