@@ -54,6 +54,7 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=15s \
     CMD curl -sf http://localhost:${FLASK_PORT}/api/health || exit 1
 
 CMD uwsgi --ini uwsgi.ini \
+    --master \ 
     --log-master \
     --http 0.0.0.0:${FLASK_PORT} \
     --processes ${UWSGI_PROCESSES} \
