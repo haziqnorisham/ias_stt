@@ -59,7 +59,8 @@ class Trap(db.Model):
             .where(cls.tracker_id == tracker_id)
             .limit(1)
         )
-        return db.session.execute(stmt).first() is not None
+        with db.engine.connect() as conn:
+            return conn.execute(stmt).first() is not None
 
     # ---- Deployment helpers ------------------------------------------------
     deployments = db.relationship(
