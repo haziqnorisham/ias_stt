@@ -2,16 +2,23 @@
 import json
 import logging
 
+from app.models.trap import Trap
+
 logger = logging.getLogger("app.data_processor")
 
 
 def device_exists(dev_eui):
-    """Check whether *dev_eui* is known in the traps tracker_id column.
-
-    Currently a stub — always returns True. Will be replaced with a database
-    query when the processing layer is wired to the traps table.
-    """
-    return True
+    """Check whether *dev_eui* is known in the traps tracker_id column."""
+    logger.info("Checking device existence for devEui: %s", dev_eui)
+    try:
+        found = Trap.exists_by_tracker_id(dev_eui)
+        logger.info("device_exists('%s') → %s", dev_eui, found)
+        return found
+    except Exception:
+        logger.exception(
+            "Database error while checking devEui '%s'", dev_eui
+        )
+        return False
 
 
 def process_message(topic, payload):
