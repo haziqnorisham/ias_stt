@@ -65,6 +65,7 @@ def create_app(config_class: type = Config) -> Flask:
     with app.app_context():
         from app.models.deployment import Deployment  # noqa: F401
         from app.models.deployment_location import DeploymentLocation  # noqa: F401
+        from app.models.smart_trap_tracker import SmartTrapTracker  # noqa: F401
         from app.models.trap import Trap  # noqa: F401  (register model)
 
         db.create_all()
@@ -72,10 +73,12 @@ def create_app(config_class: type = Config) -> Flask:
     from app.routes.api import api_bp
     from app.routes.traps import traps_bp
     from app.routes.deployments import deployments_bp
+    from app.routes.trackers import trackers_bp
 
     app.register_blueprint(api_bp)
     app.register_blueprint(traps_bp)
     app.register_blueprint(deployments_bp)
+    app.register_blueprint(trackers_bp)
 
     if app.config["ENABLE_FRONTEND"]:
         from app.routes.frontend import frontend_bp

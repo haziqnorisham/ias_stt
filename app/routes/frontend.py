@@ -26,3 +26,8 @@ def deployments_page():
 @frontend_bp.route("/mobile", methods=["GET"])
 def mobile_page():
     return render_template("mobile.html")
+
+
+@frontend_bp.route("/trackers", methods=["GET"])
+def trackers_page():
+    return render_template("trackers.html")
