@@ -2,7 +2,7 @@
 import json
 import logging
 
-from app.models.trap import Trap
+from app.models.smart_trap_tracker import SmartTrapTracker
 
 logger = logging.getLogger("app.data_processor")
 
@@ -11,7 +11,7 @@ def device_exists(dev_eui):
     """Check whether *dev_eui* is known in the traps tracker_id column."""
     logger.info("Checking device existence for devEui: %s", dev_eui)
     try:
-        found = Trap.exists_by_tracker_id(dev_eui)
+        found = SmartTrapTracker.exists_by_device_eui(dev_eui)
         logger.info("device_exists('%s') → %s", dev_eui, found)
         return found
     except Exception:

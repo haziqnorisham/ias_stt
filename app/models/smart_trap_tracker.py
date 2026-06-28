@@ -44,3 +44,16 @@ class SmartTrapTracker(db.Model):
         return (
             f"<SmartTrapTracker id={self.id} device_eui={self.device_eui!r}>"
         )
+
+    @classmethod
+    def exists_by_device_eui(cls, device_eui):
+        """Return True if a row exists with this device_eui, False otherwise."""
+        from app.models.database import get_engine
+
+        stmt = (
+            db.select(cls.device_eui)
+            .where(cls.device_eui == device_eui)
+            .limit(1)
+        )
+        with get_engine().connect() as conn:
+            return conn.execute(stmt).first() is not None
