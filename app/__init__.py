@@ -63,6 +63,10 @@ def create_app(config_class: type = Config) -> Flask:
 
     db.init_app(app)
     with app.app_context():
+        from app.models.database import set_engine
+
+        set_engine(db.engine)
+
         from app.models.deployment import Deployment  # noqa: F401
         from app.models.deployment_location import DeploymentLocation  # noqa: F401
         from app.models.smart_trap_tracker import SmartTrapTracker  # noqa: F401

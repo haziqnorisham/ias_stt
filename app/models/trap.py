@@ -54,12 +54,14 @@ class Trap(db.Model):
     @classmethod
     def exists_by_tracker_id(cls, tracker_id):
         """Return True if a row exists with this tracker_id, False otherwise."""
+        from app.models.database import get_engine
+
         stmt = (
             db.select(cls.tracker_id)
             .where(cls.tracker_id == tracker_id)
             .limit(1)
         )
-        with db.engine.connect() as conn:
+        with get_engine().connect() as conn:
             return conn.execute(stmt).first() is not None
 
     # ---- Deployment helpers ------------------------------------------------
