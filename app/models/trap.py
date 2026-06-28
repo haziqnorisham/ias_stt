@@ -32,13 +32,38 @@ class Trap(db.Model):
     )
 
     def to_dict(self):
+        location = self.location
+        door_status = self.door_status
+
+        if self.tracker_id:
+            from app.models.database import get_engine
+            from app.models.smart_trap_tracker import SmartTrapTracker
+            from sqlalchemy import select as sa_select
+
+            stmt = (
+                sa_select(
+                    SmartTrapTracker.latitude,
+                    SmartTrapTracker.longitude,
+                    SmartTrapTracker.tilt_status,
+                )
+                .where(SmartTrapTracker.device_eui == self.tracker_id)
+                .limit(1)
+            )
+            with get_engine().connect() as conn:
+                row = conn.execute(stmt).first()
+                if row:
+                    if row.latitude is not None and row.longitude is not None:
+                        location = f"{float(row.latitude)},{float(row.longitude)}"
+                    if row.tilt_status is not None:
+                        door_status = row.tilt_status
+
         return {
             "id": self.id,
             "status": self.status,
             "trap_id": self.trap_id,
             "tracker_id": self.tracker_id,
-            "location": self.location,
-            "door_status": self.door_status,
+            "location": location,
+            "door_status": door_status,
             "temperature": float(self.temperature)
             if self.temperature is not None
             else None,
