@@ -57,3 +57,23 @@ class SmartTrapTracker(db.Model):
         )
         with get_engine().connect() as conn:
             return conn.execute(stmt).first() is not None
+
+    @classmethod
+    def update_by_device_eui(cls, device_eui, **fields):
+        """Update columns of the row matching *device_eui* using the raw engine.
+
+        ``updated_date`` is auto-bumped regardless of which fields are passed.
+        Uses the stored raw engine so the call works from the MQTT thread
+        without a Flask application context.
+        """
+        from app.models.database import get_engine
+        from sqlalchemy import update as sa_update
+
+        stmt = (
+            sa_update(cls)
+            .where(cls.device_eui == device_eui)
+            .values(updated_date=_utcnow(), **fields)
+        )
+        with get_engine().connect() as conn:
+            conn.execute(stmt)
+            conn.commit()
