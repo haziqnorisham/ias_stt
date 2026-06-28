@@ -154,6 +154,10 @@ def update_trap(trap_pk):
     if not isinstance(data, dict):
         return _error("Request body must be a JSON object", 400)
 
+    current_app.logger.info(
+        "PUT /api/traps/%s payload: %s", trap_pk, data
+    )
+
     if not data.get("updated_by"):
         return _error("Field 'updated_by' is required on update", 400)
 
