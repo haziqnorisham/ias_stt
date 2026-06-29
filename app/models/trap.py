@@ -62,8 +62,9 @@ class Trap(db.Model):
                         latitude = lat
                         longitude = lng
                         map_url = (
-                            f"https://www.google.com/maps/dir/?api=1"
-                            f"&destination={lat},{lng}"
+                            f'<a href="https://www.google.com/maps/dir/?api=1'
+                            f'&destination={lat},{lng}" target="_blank">'
+                            f'{lat},{lng}</a>'
                         )
                     if row.tilt_status is not None:
                         door_status = row.tilt_status

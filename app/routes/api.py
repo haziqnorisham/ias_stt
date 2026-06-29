@@ -68,7 +68,9 @@ def dashboard_map():
             item["latitude"] = lat
             item["longitude"] = lng
             item["map_url"] = (
-                f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"
+                f'<a href="https://www.google.com/maps/dir/?api=1'
+                f'&destination={lat},{lng}" target="_blank">'
+                f'{lat},{lng}</a>'
             )
         else:
             item["latitude"] = None
