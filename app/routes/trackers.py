@@ -191,7 +191,7 @@ def update_tracker(tracker_pk):
         return _error("Internal Server Error", 500)
 
     if (
-        old_tilt == "tilted"
+        old_tilt != tracker.tilt_status
         and tracker.tilt_status == "normal"
     ):
         from app.services.notification import notify_if_trap_closed

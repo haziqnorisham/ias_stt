@@ -64,7 +64,11 @@ def _apply_inbound_update(data, dev_eui):
         SmartTrapTracker.update_by_device_eui(dev_eui, **updates)
         logger.info("Updated tracker %s with: %s", dev_eui, updates)
 
-        if "tilt_status" in updates and old_tilt == "tilted" and updates["tilt_status"] == "normal":
+        if (
+            "tilt_status" in updates
+            and old_tilt != updates["tilt_status"]
+            and updates["tilt_status"] == "normal"
+        ):
             _notify_trap_closed(dev_eui)
 
 
