@@ -119,6 +119,9 @@ function rowHtml(r) {
       <td class="timestamp">${fmtTs(r.created_date)}</td>
       <td class="timestamp">${fmtTs(r.updated_date)}</td>
       <td class="text-end actions-cell">
+        <button class="btn btn-sm btn-outline-warning" onclick="testTiltAlert(${r.id})" title="Test Alert">
+          <i class="bi bi-bell"></i>
+        </button>
         <button class="btn btn-sm btn-outline-primary" onclick="editTracker(${r.id})" title="Edit"><i class="bi bi-pencil"></i></button>
         <button class="btn btn-sm btn-outline-danger" onclick="askDelete(${r.id})" title="Delete"><i class="bi bi-trash"></i></button>
       </td>
@@ -194,6 +197,15 @@ async function confirmDelete() {
   deleteTargetId = null;
   await loadTrackers();
 }
+
+window.testTiltAlert = async function (id) {
+  const { ok, body } = await api(`${API}/${id}/test_tilt_alert`, { method: "POST" });
+  if (ok) {
+    toast((body && body.message) || "Alert triggered.");
+  } else {
+    toast((body && body.error) || "Test failed.", "error");
+  }
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!getApiKey()) { window.location.replace("/login"); return; }

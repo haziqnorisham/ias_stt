@@ -174,6 +174,8 @@ def update_tracker(tracker_pk):
         if exists is not None:
             return _error(f"device_eui '{new_device_eui}' already exists", 409)
 
+    old_tilt = tracker.tilt_status
+
     err = _apply_fields(tracker, data)
     if err:
         return _error(err, 400)
@@ -187,6 +189,14 @@ def update_tracker(tracker_pk):
         db.session.rollback()
         current_app.logger.exception("Failed to update tracker %s", tracker_pk)
         return _error("Internal Server Error", 500)
+
+    if (
+        old_tilt == "tilted"
+        and tracker.tilt_status == "normal"
+    ):
+        from app.services.notification import notify_if_trap_closed
+
+        notify_if_trap_closed(tracker.device_eui)
 
     return jsonify(tracker.to_dict()), 200
 
@@ -205,3 +215,18 @@ def delete_tracker(tracker_pk):
         current_app.logger.exception("Failed to delete tracker %s", tracker_pk)
         return _error("Internal Server Error", 500)
     return jsonify({"message": f"Tracker {tracker_pk} deleted"}), 200
+
+
+@trackers_bp.route("/<int:tracker_pk>/test_tilt_alert", methods=["POST"])
+@require_api_key
+def test_tilt_alert(tracker_pk):
+    tracker = db.session.get(SmartTrapTracker, tracker_pk)
+    if tracker is None:
+        return _error("Tracker not found", 404)
+
+    from app.services.notification import notify_if_trap_closed
+
+    ok = notify_if_trap_closed(tracker.device_eui)
+    if ok:
+        return jsonify({"message": "Tilt alert sent"}), 200
+    return jsonify({"message": "No linked trap or no coordinates — alert not sent"}), 200

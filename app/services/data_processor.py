@@ -57,8 +57,36 @@ def _apply_inbound_update(data, dev_eui):
         updates[col] = value
 
     if updates:
+        old_tilt = None
+        if "tilt_status" in updates:
+            old_tilt = _get_current_tilt(dev_eui)
+
         SmartTrapTracker.update_by_device_eui(dev_eui, **updates)
         logger.info("Updated tracker %s with: %s", dev_eui, updates)
+
+        if "tilt_status" in updates and old_tilt == "tilted" and updates["tilt_status"] == "normal":
+            _notify_trap_closed(dev_eui)
+
+
+def _get_current_tilt(dev_eui):
+    """Return the current tilt_status for *dev_eui*, or None."""
+    from app.models.database import get_engine
+    from sqlalchemy import select as sa_select
+
+    stmt = (
+        sa_select(SmartTrapTracker.tilt_status)
+        .where(SmartTrapTracker.device_eui == dev_eui)
+        .limit(1)
+    )
+    with get_engine().connect() as conn:
+        row = conn.execute(stmt).first()
+        return row[0] if row else None
+
+
+def _notify_trap_closed(dev_eui):
+    from app.services.notification import notify_if_trap_closed
+
+    notify_if_trap_closed(dev_eui)
 
 
 def process_message(topic, payload):
