@@ -34,6 +34,9 @@ class Trap(db.Model):
     def to_dict(self):
         location = self.location
         door_status = self.door_status
+        latitude = None
+        longitude = None
+        map_url = None
 
         if self.tracker_id:
             from app.models.database import get_engine
@@ -53,7 +56,15 @@ class Trap(db.Model):
                 row = conn.execute(stmt).first()
                 if row:
                     if row.latitude is not None and row.longitude is not None:
-                        location = f"{float(row.latitude)},{float(row.longitude)}"
+                        lat = float(row.latitude)
+                        lng = float(row.longitude)
+                        location = f"{lat},{lng}"
+                        latitude = lat
+                        longitude = lng
+                        map_url = (
+                            f"https://www.google.com/maps/dir/?api=1"
+                            f"&destination={lat},{lng}"
+                        )
                     if row.tilt_status is not None:
                         door_status = row.tilt_status
 
@@ -64,6 +75,9 @@ class Trap(db.Model):
             "tracker_id": self.tracker_id,
             "location": location,
             "door_status": door_status,
+            "latitude": latitude,
+            "longitude": longitude,
+            "map_url": map_url,
             "temperature": float(self.temperature)
             if self.temperature is not None
             else None,
