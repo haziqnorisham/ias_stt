@@ -1,5 +1,5 @@
 """API routes: public Hello World plus the auth verification endpoint."""
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, redirect
 from sqlalchemy import select
 
 from app.auth import require_api_key
@@ -10,9 +10,9 @@ api_bp = Blueprint("api", __name__)
 
 
 @api_bp.route("/", methods=["GET"])
-def hello_world():
-    current_app.logger.info("Hello World endpoint hit")
-    return "Hello World"
+def root_to_traps():
+    current_app.logger.info("Redirecting to /traps")
+    return redirect("/traps")
 
 
 @api_bp.route("/api/health", methods=["GET"])
