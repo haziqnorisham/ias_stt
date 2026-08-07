@@ -14,6 +14,25 @@ def root_to_traps():
     current_app.logger.info("Redirecting to /traps")
     return redirect("/traps")
 
+@api_bp.route("/api/geofencing", methods=["GET", "POST"])
+def geofencing():
+    current_app.logger.info("Redirecting to /geofencing")
+    #for post req hanling
+    if request.method == 'POST':
+        data = request.get_json()
+        #extract and validate incoming data with variable 
+        #the variable data can be used to store the incoming data 
+    return jsonify({
+            "message": "Geofencing data received"
+    }), 201
+
+    #for get req handling
+    if request.method == 'GET':
+         # Convert the database row objects into a clean Python list of dictionaries
+        return jsonify({
+            "message": "Geofencing data retrieval endpoint"
+        }), 200
+
 
 @api_bp.route("/api/health", methods=["GET"])
 def health():
