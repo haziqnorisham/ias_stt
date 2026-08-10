@@ -1,5 +1,5 @@
 """API routes: public Hello World plus the auth verification endpoint."""
-from app.models.geofencing import Geofencing
+from app.models.server_configuration import server_configuration
 from flask import Blueprint, current_app, jsonify, request, redirect
 from sqlalchemy import select
 
@@ -15,57 +15,6 @@ api_bp = Blueprint("api", __name__)
 def root_to_traps():
     current_app.logger.info("Redirecting to /traps")
     return redirect("/traps")
-
-@api_bp.route("/api/geofencing", methods=["GET", "POST"])
-def geofencing():
-    current_app.logger.info("Redirecting to /geofencing")
-
-    if request.method == 'POST':
-        data = request.get_json()
-        # Extract and validate incoming data with variable `data`.
-        id = data.get('id')
-        trap_id = data.get('trap_id')
-        latitude = data.get('latitude')
-        longitude = data.get('longitude')
-        diameter = data.get('diameter')
-        if not id or not trap_id or not latitude or not longitude or not diameter:
-            return jsonify({"error": "Missing required fields"}), 400
-
-        new_geofencing = Geofencing(
-            id=id,
-            trap_id=trap_id,
-            latitude=latitude,
-            longitude=longitude,
-            diameter=diameter
-        )
-        db.session.add(new_geofencing)
-        db.session.commit()
-        return jsonify({
-            "message": "Geofencing data received"
-        }), 201
-
-    elif request.method == 'GET':
-        # Query ALL geofencing entries currently saved in the database
-        all_geofencing = Geofencing.query.all()
-
-        # Convert the database row objects into a clean Python list of dictionaries
-        output = []
-        for geofencing in all_geofencing:
-            output.append({
-                "id": geofencing.id,
-                "trap_id": geofencing.trap_id,
-                "latitude": geofencing.latitude,
-                "longitude": geofencing.longitude,
-                "diameter": geofencing.diameter,
-                "created_at": geofencing.created_at.isoformat() if geofencing.created_at else None,
-                "updated_at": geofencing.updated_at.isoformat() if geofencing.updated_at else None
-            })
-        return jsonify({
-            "message": "Geofencing data retrieval endpoint",
-            "geofencing data": output
-        }), 200
-
-    return jsonify({"message": "Unsupported method"}), 405
 
 
 @api_bp.route("/api/health", methods=["GET"])
