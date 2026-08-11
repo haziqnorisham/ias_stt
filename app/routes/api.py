@@ -1,10 +1,12 @@
 """API routes: public Hello World plus the auth verification endpoint."""
+from app.models.server_configuration import server_configuration
 from flask import Blueprint, current_app, jsonify, request, redirect
 from sqlalchemy import select
 
 from app.auth import require_api_key
 from app.models.database import get_engine
 from app.models.trap import Trap
+from app.models.database import db 
 
 api_bp = Blueprint("api", __name__)
 
