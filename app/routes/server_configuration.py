@@ -65,18 +65,37 @@ def create_server_configuration():
 def get_server_configuration():
     # Query ALL server configuration entries currently saved in the database
     all_server_configuration = server_configuration.query.all()
+    args = request.args
+    config_key = args.get('config_key', None)
 
     output = []
-    for config in all_server_configuration:
-        output.append(
-            {
-                "id": config.id,
-                "config_key": config.config_key,
-                "value": config.value,
-                "created_at": config.created_at.isoformat() if config.created_at else None,
-                "updated_at": config.updated_at.isoformat() if config.updated_at else None,
-            }
-        )
+    if config_key is not None:
+        # Filter configurations based on the 'config_key' parameter
+        filtered_configurations = server_configuration.query.filter(server_configuration.config_key.startswith(config_key)).all()
+        for config in filtered_configurations:
+            output.append(
+                {
+                    "id": config.id,
+                    "config_key": config.config_key,
+                    "value": config.value,
+                    "created_at": config.created_at.isoformat() if config.created_at else None,
+                    "updated_at": config.updated_at.isoformat() if config.updated_at else None,
+                }
+            )
+
+    elif config_key is None:
+        # If 'config_key' parameter is not provided, return all configurations
+        all_server_configuration = server_configuration.query.all()
+        for config in all_server_configuration:
+            output.append(
+                {
+                    "id": config.id,
+                    "config_key": config.config_key,
+                    "value": config.value,
+                    "created_at": config.created_at.isoformat() if config.created_at else None,
+                    "updated_at": config.updated_at.isoformat() if config.updated_at else None,
+                }
+            )
 
     return jsonify(
         {
