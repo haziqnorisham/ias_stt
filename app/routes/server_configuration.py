@@ -1,4 +1,4 @@
-"""CRUD API for Geofencing (/api/geofencing)."""
+"""CRUD API for Server Configuration (/api/server_configuration)."""
 from decimal import Decimal
 
 from flask import Blueprint, current_app, jsonify, request
@@ -21,7 +21,10 @@ def create_server_configuration():
     new_server_configurations = []
 
     try:
-
+        """Determines whether to update existing server_configurationdata or add a new one.
+        If the request body contains an 'id' and 'value', it updates the existing row with that id.
+        If the request body contains a 'config_key', it adds a new row with that config_key and value.
+        """
         if "id" in data and "value" in data:
             row_id = data["id"]
             field_value = str(data.get("value"))
@@ -40,9 +43,9 @@ def create_server_configuration():
             db.session.add(existing_row)
 
         elif "config_key" in data:
-            config_group = data.get("config_key")
             if not isinstance(config_group, dict):
                 return jsonify({"error": "Expected 'config_key' payload to be an object"}), 400
+            config_group = data.get("config_key")
 
             for config_type, payload in config_group.items():
                 if not isinstance(payload, dict):
