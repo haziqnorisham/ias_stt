@@ -117,11 +117,11 @@ def _create_new_deployment(dev_eui, latitude, longitude):
     for item in config_data: 
         key = item.get("config_key")
 
-        if key == "geofence_latitude":
+        if key == "geofencing_latitude":
             config_latitude = float(item.get("value"))
-        elif key == "geofence_longitude":
+        elif key == "geofencing_longitude":
             config_longitude = float(item.get("value"))
-        elif key == "geofence_radius":
+        elif key == "geofencing_radius":
             config_radius = float(item.get("value"))
 
     user_coords = (latitude, longitude)
