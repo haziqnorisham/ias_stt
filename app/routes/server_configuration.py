@@ -18,35 +18,59 @@ def create_server_configuration():
     if not isinstance(data, dict):
         return jsonify({"error": "Request body must be a JSON object"}), 400
 
-    config_group = data.get("config_key")
-    if not isinstance(config_group, dict):
-        return jsonify({"error": "Expected 'config_key' object"}), 400
-
-
     new_server_configurations = []
 
     try:
-        for config_type, payload in config_group.items():
-            if not isinstance(payload, dict):
-                return jsonify({
-                    "error": f"Expected '{config_type}' payload to be an object"
-                }), 400
 
-        for field_name, field_value in payload.items():
-            config_key = f"{config_type}_{field_name}"
-            row = server_configuration(
-                config_key=config_key,
-                value=str(field_value),
-            )
-            db.session.add(row)
-            new_server_configurations.append(
-                {
-                    "config_key": config_key,
-                    "value": str(field_value),
-                }
-            )
+        if "id" in data and "value" in data:
+            row_id = data["id"]
+            field_value = str(data.get("value"))
+
+            existing_row = server_configuration.query.filter_by(id=row_id).first()
+            if not existing_row:
+                return jsonify({"error": f"No server configuration found with id {row_id}"}), 404
+
+            existing_row.value = field_value
+
+            new_server_configurations.append({
+                "id": existing_row.id,
+                "config_key": existing_row.config_key,
+                "value": existing_row.value,
+            })
+            db.session.add(existing_row)
+
+        elif "config_key" in data:
+            config_group = data.get("config_key")
+            if not isinstance(config_group, dict):
+                return jsonify({"error": "Expected 'config_key' payload to be an object"}), 400
+
+            for config_type, payload in config_group.items():
+                if not isinstance(payload, dict):
+                    return jsonify({"error": f"Expected '{config_type}' payload to be an object"}), 400
+
+            for config_type, payload in config_group.items():
+                for field_name, field_data in payload.items():
+                    config_key = f"{config_type}_{field_name}"
+                    field_value = str(field_data)
+
+                    new_row = server_configuration(
+                        config_key=config_key, 
+                        value=field_value
+                    )
+
+                    db.session.add(new_row)
+                    db.session.flush()  # Flush to get the ID of the new row
+                    new_server_configurations.append({
+                        "id": new_row.id,
+                        "config_key": config_key,
+                        "value": field_value,
+                    })
+
+        else:
+            return jsonify({"error": "Request body must contain either 'id' and 'value' or 'config_key'"}), 400
 
         db.session.commit()
+
     except Exception:
         db.session.rollback()
         current_app.logger.exception("Failed to save server configuration")
