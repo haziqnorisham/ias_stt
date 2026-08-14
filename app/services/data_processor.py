@@ -1,13 +1,11 @@
 """MQTT message processing — currently log-only; hook for future logic."""
 import json
 import logging
-from urllib import response
-import requests
 from geopy.distance import geodesic
 from app.services import deployment_service
 from app.models.trap import Trap
 from app.models.database import db
-
+from app.models.server_configuration import server_configuration
 from app.models.smart_trap_tracker import SmartTrapTracker
 
 logger = logging.getLogger("app.data_processor")
@@ -86,6 +84,7 @@ def _apply_inbound_update(data, dev_eui):
         ):
             _notify_trap_closed(dev_eui)
 
+    logger.info("Before geofence check for device %s", dev_eui)
     if latitude is not None and longitude is not None:
         _create_new_deployment(dev_eui, latitude, longitude)
 
@@ -94,39 +93,58 @@ def _create_new_deployment(dev_eui, latitude, longitude):
     """Create a new deployment if the sensor status is inactive and its position is outside the geofence, 
     or close the active deployment if the sensor position is inside the geofence.
     """
-    stt_url = "/api/stt"
-    server_config_url = "/api/server_configuration"
+    
+    # Query ALL server configuration entries currently saved in the database
+    all_server_configuration = server_configuration.query.all()
+    if not all_server_configuration:
+        logger.warning("No server configuration entries found; skipping geofence check")
+        return
 
-    """"fetch the geofence configuration from the server_configuration table"""
-    response_config = requests.get(f"{server_config_url}?config_key=geofence")
+    geofence_rows = (
+        server_configuration.query
+        .filter(server_configuration.config_key.startswith("geofence"))
+        .all()
+    )
 
-    """"fetch the geofence data from the smart_trap_tracker table"""
-    response_tracker = requests.get(f"{stt_url}")
+    logger.info("Retrieved geofence configuration rows: %s", geofence_rows)
 
-    if not response_config.status_code == 200:
-        print(f"Error {response_config.status_code}:", response_config.text)
-
-    api_response = response_config.json()
-
-    config_data = api_response.get("server_configuration_data", [])
-
+    config_map = {}
+    for row in geofence_rows:
+        config_map[row.config_key] = row.value
+    
     config_latitude = None
     config_longitude = None
     config_radius = None
 
-    for item in config_data: 
-        key = item.get("config_key")
+    try:
+        for key, value in config_map.items():
+            if key == "geofence_latitude":
+                config_latitude = float(value)
+            elif key == "geofence_longitude":
+                config_longitude = float(value)
+            elif key == "geofence_radius":
+                config_radius = float(value)
+    except (ValueError, TypeError):
+        logger.error("Invalid geofence configuration values; skipping geofence check")
+        return
 
-        if key == "geofence_latitude":
-            config_latitude = float(item.get("value"))
-        elif key == "geofence_longitude":
-            config_longitude = float(item.get("value"))
-        elif key == "geofence_radius":
-            config_radius = float(item.get("value"))
-
+    logger.info(
+        "Geofence configuration: latitude=%s, longitude=%s, radius=%s km",
+        config_latitude,
+        config_longitude,
+        config_radius,
+    )
+    if config_latitude is None or config_longitude is None or config_radius is None:
+        logger.warning("Incomplete geofence configuration; skipping geofence check")
+        return
     user_coords = (latitude, longitude)
     fence_coords = (config_latitude, config_longitude)
-
+    logger.info(
+        "Checking geofence for device %s at coordinates (%s, %s)",
+        dev_eui,
+        latitude,
+        longitude
+    )
     """Check if the user coordinates are within the geofence defined by the configuration."""
     within_geofence = is_within_geofence(user_coords, fence_coords, config_radius)
     logger.info(
@@ -180,6 +198,9 @@ def is_within_geofence(user_coords, fence_coords, radius_km):
     """
     # geodesic() calculates the high-accuracy distance on the Earth's ellipsoid
     distance = geodesic(user_coords, fence_coords).km
+    logger.info(
+        "Calculated distance from geofence center: %.3f km (radius: %.3f km)", distance, radius_km
+    )
     return distance <= radius_km
     
 
