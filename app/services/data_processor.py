@@ -95,7 +95,7 @@ def _create_new_deployment(dev_eui, latitude, longitude):
     or close the active deployment if the sensor position is inside the geofence.
     """
     stt_url = "/api/stt"
-    server_config_url = "/server_configuration"
+    server_config_url = "/api/server_configuration"
 
     """"fetch the geofence configuration from the server_configuration table"""
     response_config = requests.get(f"{server_config_url}?config_key=geofence")
@@ -117,11 +117,11 @@ def _create_new_deployment(dev_eui, latitude, longitude):
     for item in config_data: 
         key = item.get("config_key")
 
-        if key == "geofencing_latitude":
+        if key == "geofence_latitude":
             config_latitude = float(item.get("value"))
-        elif key == "geofencing_longitude":
+        elif key == "geofence_longitude":
             config_longitude = float(item.get("value"))
-        elif key == "geofencing_radius":
+        elif key == "geofence_radius":
             config_radius = float(item.get("value"))
 
     user_coords = (latitude, longitude)
