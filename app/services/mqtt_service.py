@@ -33,6 +33,7 @@ class MQTTService:
         self.client_id = client_id
         self.topics = topics or []
         self.keepalive = int(keepalive)
+        self.app = None
 
         # Track subscribe message-id -> topic so on_subscribe can report which
         # topic each SUBACK refers to.
@@ -165,7 +166,8 @@ class MQTTService:
 
             from app.services.data_processor import process_message
 
-            process_message(msg.topic, decoded)
+            with self.app.app_context():
+                process_message(msg.topic, decoded)
         except Exception:
             logger.exception("Error while handling incoming MQTT message")
 
@@ -205,6 +207,7 @@ def init_mqtt(app):
         password=config.get("MQTT_PASSWORD"),
         keepalive=config["MQTT_KEEPALIVE"],
     )
+    service.app = app
     service.connect()
 
     # Keep a handle on the app and ensure clean shutdown.

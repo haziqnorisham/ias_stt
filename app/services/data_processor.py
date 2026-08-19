@@ -95,13 +95,13 @@ def _create_new_deployment(dev_eui, latitude, longitude):
     """
     
     # Query ALL server configuration entries currently saved in the database
-    all_server_configuration = server_configuration.query.all()
+    all_server_configuration = db.session.query(server_configuration).all()
     if not all_server_configuration:
         logger.warning("No server configuration entries found; skipping geofence check")
         return
 
     geofence_rows = (
-        server_configuration.query
+        db.session.query(server_configuration)
         .filter(server_configuration.config_key.startswith("geofence"))
         .all()
     )
@@ -158,7 +158,7 @@ def _create_new_deployment(dev_eui, latitude, longitude):
     )
 
     """Check the deployment status of the trap based on its tracker_id and the geofence status."""
-    trap = Trap.query.filter_by(tracker_id=dev_eui).first()
+    trap = db.session.query(Trap).filter_by(tracker_id=dev_eui).first()
     if not trap:
         # no trap known for this device
         logger.info("No Trap found for tracker_id=%s", dev_eui)
