@@ -23,16 +23,25 @@
 <body>
   <nav class="navbar navbar-dark bg-dark sticky-top">
     <div class="container-fluid">
-      <span class="navbar-brand mb-0 h1">
+      <span class="navbar-brand mb-0 h1 d-inline-flex align-items-center">
+        <a href="/traps" class="logo-link">
+          <img src="{{ url_for('static', filename='images/ias-1.png') }}" alt="Company Logo" class="logo-img">
+        </a>
         <i class="bi bi-phone me-2"></i>Mobile Deployments
       </span>
-      <div class="d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center gap-3">
         <span class="text-light small" id="recordCount"></span>
+        <a class="btn btn-sm btn-outline-light" href="/trackers">
+          <i class="bi bi-geo-alt-fill"></i> Trackers
+        </a>
         <a class="btn btn-sm btn-outline-light" href="/traps">
-          <i class="bi bi-bug-fill"></i>
+          <i class="bi bi-bug-fill"></i> Traps
+        </a>
+        <a class="btn btn-sm btn-outline-light" href="/deployments">
+          <i class="bi bi-clock-history"></i> Deployments
         </a>
         <button class="btn btn-sm btn-outline-light" id="logoutBtn">
-          <i class="bi bi-box-arrow-right"></i>
+          <i class="bi bi-box-arrow-right"></i> Logout
         </button>
       </div>
     </div>

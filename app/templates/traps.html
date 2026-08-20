@@ -17,7 +17,10 @@
 <body>
   <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-      <span class="navbar-brand mb-0 h1">
+      <span class="navbar-brand mb-0 h1 d-inline-flex align-items-center">
+        <a href="/traps" class="logo-link">
+          <img src="{{ url_for('static', filename='images/ias-1.png') }}" alt="Company Logo" class="logo-img">
+        </a>
         <i class="bi bi-bug-fill me-2"></i>Trap Management
       </span>
       <div class="d-flex align-items-center gap-3">

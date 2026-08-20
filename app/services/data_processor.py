@@ -162,35 +162,47 @@ def _create_new_deployment(dev_eui, latitude, longitude):
     if not trap:
         # no trap known for this device
         logger.info("No Trap found for tracker_id=%s", dev_eui)
-        active = None
+        deployment_status = None
     else:
-        active = trap.get_active_deployment()  # Deployment or None
+        deployment_status = trap.get_active_deployment()  # Deployment or None
         logger.info(
             "Found Trap id=%s tracker_id=%s active_deployment=%s",
             trap.id,
             trap.tracker_id,
-            getattr(active, "id", None),
+            trap.status,
+            getattr(deployment_status, "id", None),
         )
 
-        """Determine the action to take based on the geofence status and deployment status."""
-        if within_geofence and active:
-                # if the trap is within the geofence and has an active deployment, close it
-                logger.info("Within geofence and active deployment exists; closing deployment for trap id=%s", trap.id)
-                deployment_service.close_active_deployment(trap)
-                db.session.commit()
-        elif within_geofence and not active:
-                # if the trap is within the geofence and has no active deployment, do nothing
-                logger.info("Within geofence and no active deployment; no action for trap id=%s", getattr(trap, "id", None))
+        trap_status = trap.status if trap else "unknown"
+
+    """Determine the action to take based on the geofence status and deployment status.
+       Added trap status updates active/inactive on the traps table.
+    """
+
+    if within_geofence:
         
-        elif not within_geofence and active:
-                # if the trap is outside the geofence and has an active deployment, do nothing
-                logger.info("Outside geofence and active deployment exists; no action for trap id=%s", trap.id)
-        elif not within_geofence and not active:
-                # if the trap is outside the geofence and has no active deployment, create one
-                logger.info("Outside geofence and no active deployment; creating deployment for trap id=%s", getattr(trap, "id", None))
-                deployment_service.create_deployment(trap, location=f"{latitude},{longitude}")
-                db.session.commit()
-    
+        if deployment_status and trap_status == "active":
+            logger.info("Within geofence and active deployment exists; closing deployment for trap id=%s", trap.id)
+            deployment_service.close_active_deployment(trap)
+        elif not deployment_status and trap_status == "active":
+            logger.info("Within geofence and no active deployment; no action for trap id=%s", getattr(trap, "id", None))
+
+        trap_status = "inactive"
+        trap.status = trap_status
+        db.session.commit()
+
+    else:  # Not within geofence
+        
+        if deployment_status and trap_status == "inactive":
+            logger.info("Outside geofence and active deployment exists; no action for trap id=%s", trap.id)
+        elif not deployment_status and trap_status == "inactive":
+            logger.info("Outside geofence and no active deployment; creating deployment for trap id=%s", getattr(trap, "id", None))
+            deployment_service.create_deployment(trap, location=f"{latitude},{longitude}")
+
+        trap_status = "active"
+        trap.status = trap_status
+        db.session.commit()
+
 
 def is_within_geofence(user_coords, fence_coords, radius_km):
     """Checks if user_coords is within radius_km of fence_coords.
