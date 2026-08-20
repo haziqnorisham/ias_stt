@@ -20,7 +20,7 @@ STRING_FIELDS = {
     "notes": 255,
     "updated_by": 50,
 }
-REQUIRED_CREATE = ("status", "trap_id", "tracker_id")
+REQUIRED_CREATE = ("status", "trap_id")
 EDITABLE_FIELDS = (
     "status",
     "trap_id",
@@ -126,6 +126,8 @@ def create_trap():
     err = _apply_fields(trap, data)
     if err:
         return _error(err, 400)
+    if not trap.tracker_id:
+        trap.tracker_id = ""
     if not trap.updated_by:
         trap.updated_by = "system"
 
@@ -173,6 +175,9 @@ def update_trap(trap_pk):
     err = _apply_fields(trap, data)
     if err:
         return _error(err, 400)
+
+    if not trap.tracker_id:
+        trap.tracker_id = ""
 
     if previous_status != trap.status:
         if previous_status == "inactive" and trap.status == "active":

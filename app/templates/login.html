@@ -1,12 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login — Trap Management</title>
+  <script>
+    // Apply the persisted theme before first paint (dark is the default).
+    (function () {
+      try {
+        var t = localStorage.getItem("ias-theme");
+        document.documentElement.setAttribute(
+          "data-bs-theme", t === "light" ? "light" : "dark"
+        );
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/sb-admin-2.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}" />
 </head>
 <body class="bg-gradient-primary">
   <div class="login-page">

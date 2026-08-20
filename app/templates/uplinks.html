@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% set active_page = "uplinks" %}
+
+{% block title %}Tracker Uplinks{% endblock %}
+
+{% block page_title %}Tracker Uplinks{% endblock %}
+{% block page_heading %}Tracker Uplinks{% endblock %}
+{% block breadcrumb_active %}Uplinks{% endblock %}
+
+{% block page_heading_actions %}
+<button class="btn btn-sm btn-outline-primary shadow-sm" id="refreshBtn" type="button">
+  <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="card border-left-warning">
+  <div class="card-header py-3 d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between">
+    <h6 class="m-0 font-weight-bold"><i class="bi bi-activity me-1"></i>Decoded telemetry history</h6>
+    <div class="d-flex flex-wrap gap-2">
+      <select class="form-select form-select-sm" id="trackerFilter" style="min-width: 220px">
+        <option value="">All trackers</option>
+      </select>
+      <select class="form-select form-select-sm w-auto" id="sourceFilter">
+        <option value="">All sources</option>
+        <option value="http">HTTP</option>
+        <option value="mqtt">MQTT</option>
+      </select>
+      <select class="form-select form-select-sm w-auto" id="pageSize">
+        <option value="10">10 / page</option>
+        <option value="25" selected>25 / page</option>
+        <option value="50">50 / page</option>
+        <option value="100">100 / page</option>
+      </select>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Received</th>
+            <th>Tracker</th>
+            <th>Device EUI</th>
+            <th>Coordinates</th>
+            <th>Position</th>
+            <th>Battery</th>
+            <th>Source</th>
+            <th class="text-end">Details</th>
+          </tr>
+        </thead>
+        <tbody id="uplinksBody">
+          <tr><td colspan="8" class="text-center text-muted py-4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer d-flex justify-content-between align-items-center py-2">
+    <small class="text-gray-600" id="pageInfo"></small>
+    <div class="btn-group">
+      <button class="btn btn-sm btn-outline-secondary" id="prevBtn" type="button" disabled>
+        <i class="bi bi-chevron-left"></i> Prev
+      </button>
+      <button class="btn btn-sm btn-outline-secondary" id="nextBtn" type="button" disabled>
+        Next <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<div class="modal fade" id="uplinkDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="uplinkDetailTitle">Uplink details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <div class="small text-gray-600">Received</div>
+            <div class="fw-bold" id="detailReceived">—</div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-gray-600">Tracker</div>
+            <div class="fw-bold" id="detailDevice">—</div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-gray-600">Source</div>
+            <div class="fw-bold" id="detailSource">—</div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-gray-600">Coordinates</div>
+            <div class="fw-bold" id="detailCoordinates">—</div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-gray-600">Position</div>
+            <div class="fw-bold" id="detailPosition">—</div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-gray-600">Battery</div>
+            <div class="fw-bold" id="detailBattery">—</div>
+          </div>
+          <div class="col-12">
+            <div class="small text-gray-600">Topic / endpoint</div>
+            <div class="font-monospace small text-break" id="detailTopic">—</div>
+          </div>
+        </div>
+        <h6 class="text-primary">Raw decoded payload</h6>
+        <pre class="bg-light border rounded p-3 small mb-0" id="rawPayload">Loading…</pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/uplinks.js') }}"></script>
+{% endblock %}

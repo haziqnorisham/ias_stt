@@ -8,6 +8,7 @@ behaviour is equivalent at the ORM layer.
 from datetime import datetime, timezone
 
 from app.models.database import db
+from app.time_utils import format_app_datetime
 
 
 def _utcnow():
@@ -84,8 +85,8 @@ class Trap(db.Model):
             else None,
             "notes": self.notes,
             "updated_by": self.updated_by,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": format_app_datetime(self.created_at),
+            "updated_at": format_app_datetime(self.updated_at),
         }
 
     def __repr__(self):

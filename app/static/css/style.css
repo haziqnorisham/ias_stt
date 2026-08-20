@@ -1,4 +1,4 @@
-/* App-specific styles layered on top of the SB Admin 2 theme. */
+/* App-specific styles layered on top of the theme (uses theme tokens). */
 
 th.sortable {
   cursor: pointer;
@@ -7,24 +7,27 @@ th.sortable {
 }
 
 th.sortable:hover {
-  background-color: #eaecf4;
+  background-color: var(--surface-2);
+  color: var(--text);
 }
 
 th.sortable::after {
   content: "\2195";
-  opacity: 0.3;
+  opacity: 0.35;
   margin-left: 0.35rem;
   font-size: 0.8em;
 }
 
 th.sortable.sort-asc::after {
   content: "\2191";
-  opacity: 0.9;
+  opacity: 1;
+  color: var(--accent);
 }
 
 th.sortable.sort-desc::after {
   content: "\2193";
-  opacity: 0.9;
+  opacity: 1;
+  color: var(--accent);
 }
 
 #trapsBody td {
@@ -33,7 +36,7 @@ th.sortable.sort-desc::after {
 
 .timestamp {
   font-size: 0.8rem;
-  color: #6c757d;
+  color: var(--text-muted);
   white-space: nowrap;
 }
 

@@ -31,3 +31,8 @@ def mobile_page():
 @frontend_bp.route("/trackers", methods=["GET"])
 def trackers_page():
     return render_template("trackers.html")
+
+
+@frontend_bp.route("/uplinks", methods=["GET"])
+def uplinks_page():
+    return render_template("uplinks.html")

@@ -45,7 +45,8 @@ ENV FLASK_PORT=5000 \
     UWSGI_PROCESSES=2 \
     UWSGI_THREADS=2 \
     PYTHONUNBUFFERED=1 \
-    FLASK_ENV=production
+    FLASK_ENV=production \
+    TZ=Asia/Kuala_Lumpur
 COPY uwsgi.ini ./uwsgi.ini
 
 EXPOSE ${FLASK_PORT}

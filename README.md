@@ -11,6 +11,9 @@ web UI for managing traps.
 - **HTTP telemetry ingest** at `POST /api/telemetry/ingest` — receives decoded
   GPS tracker payloads from ChirpStack's HTTP integration and runs the shared
   processing pipeline (tracker update, geofence + deployment logic).
+- **Tracker uplink history** — every valid uplink from a registered tracker is
+  persisted with parsed telemetry fields and the original decoded JSON payload;
+  view it through `/api/uplinks` or the `/uplinks` UI page.
 - **MQTT monitoring** (paho-mqtt 2.x, optional, off by default) — background,
   non-blocking client with auto-reconnect/backoff, resubscribe-on-connect, and
   console logging of every received message. Toggle with `MQTT_ENABLED`.
@@ -34,10 +37,12 @@ web UI for managing traps.
 │   ├── routes/
 │   │   ├── api.py             # Hello World (/) + /api/auth/verify
 │   │   ├── traps.py           # CRUD API (/api/traps)
+│   │   ├── uplinks.py         # Uplink history API (/api/uplinks)
 │   │   └── frontend.py        # web UI routes (/traps, /login)
 │   ├── models/
 │   │   ├── database.py        # shared SQLAlchemy instance
-│   │   └── trap.py            # Trap model
+│   │   ├── trap.py            # Trap model
+│   │   └── tracker_uplink.py  # Persisted tracker uplink history
 │   ├── services/
 │   │   └── mqtt_service.py    # MQTT client + init_mqtt(app)
 │   ├── templates/             # traps.html, login.html
@@ -81,7 +86,7 @@ curl http://localhost:5000/
 ## API documentation (OpenAPI)
 
 An `openapi.yaml` specification is included in the project root covering all
-20 endpoints, data models, and authentication. Import it into **Bruno**:
+22 endpoints, data models, and authentication. Import it into **Bruno**:
 
 1. Open Bruno → *Collections* → *Import Collection*
 2. Choose **OpenAPI v3** → select `openapi.yaml`
@@ -99,6 +104,7 @@ Config is read from environment variables (see `.env.example`).
 | `FLASK_PORT`       | `5000`        | HTTP port.                                   |
 | `LOG_LEVEL`        | `DEBUG`       | Logging verbosity.                           |
 | `LOG_DIR`          | `logs`        | Rotating log file folder.                    |
+| `APP_TIMEZONE`     | `Asia/Kuala_Lumpur` | Timezone for API timestamps, UI dates, and application logs. |
 | `ENABLE_FRONTEND`  | `true`        | Serve the `/traps` UI; `false` → 404.        |
 | `API_KEY`          | — (unset)     | Secret for `/api/*` + UI login. Unset → auth disabled (warning logged). |
 | `DATABASE_URL`     | `sqlite:///data/traps.db` | SQLAlchemy database URL.         |
@@ -110,6 +116,24 @@ Config is read from environment variables (see `.env.example`).
 | `MQTT_USERNAME`    | —             | Optional broker username.                    |
 | `MQTT_PASSWORD`    | —             | Optional broker password.                    |
 | `MQTT_KEEPALIVE`   | `60`          | Keepalive seconds.                           |
+
+## Time handling
+
+The application stores timestamps in UTC and converts them to `APP_TIMEZONE`
+when serializing API responses, rendering frontend dates, and writing
+application logs. The default is `Asia/Kuala_Lumpur`, which is UTC+8.
+
+Set another IANA timezone in `.env` if needed, for example:
+
+```dotenv
+APP_TIMEZONE=Asia/Singapore
+```
+
+Restart the application after changing the setting. Existing database records
+are not rewritten; they remain UTC and are converted using the current setting
+when returned or displayed. Docker containers also receive the same timezone
+through `TZ`. For a non-Docker deployment, the host operating-system timezone
+can be aligned separately with `sudo timedatectl set-timezone Asia/Kuala_Lumpur`.
 
 ## Telemetry ingestion (`POST /api/telemetry/ingest`)
 
@@ -155,6 +179,36 @@ curl -X POST http://localhost:5000/api/telemetry/ingest \
 | `400` | Body is not valid JSON.                              |
 | `401` | Missing/invalid API key (when `API_KEY` is set).     |
 
+## Tracker uplink history (`/api/uplinks` and `/uplinks`)
+
+Every valid JSON uplink whose `deviceInfo.devEui` matches a registered
+`smart_trap_tracker.device_eui` is stored as a separate row in the
+`tracker_uplinks` table. This happens for both HTTP and MQTT ingestion paths.
+Unknown devices are not stored. An uplink is recorded even when its `object`
+section is missing or does not contain any recognized sensor fields.
+
+Each stored row includes:
+
+- The device EUI, receive timestamp, source, and MQTT topic/HTTP endpoint
+- Parsed latitude, longitude, position, and battery values when valid
+- The original decoded JSON payload for audit and troubleshooting
+
+The raw payload is stored in the database but is never written to application
+logs. The list endpoint excludes it to keep responses compact; the detail
+endpoint and the **View** action on `/uplinks` expose it on demand. There is no
+automatic retention cleanup, so the `tracker_uplinks` table will grow with each
+received uplink.
+
+### Endpoints
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/api/uplinks` | List history, newest first. Query: `limit`, `offset`, `device_eui`, `source`. |
+| GET | `/api/uplinks/<id>` | Get one uplink including its raw decoded JSON payload. |
+
+The SB Admin 2-style `/uplinks` page provides tracker/source filters,
+pagination, refresh, and an uplink detail modal.
+
 ## Trap configuration API (`/api/traps`)
 
 Trap device configurations are stored in a file-based **SQLite** database
@@ -176,7 +230,7 @@ the `DATABASE_URL` environment variable.
 | `id`          | integer        | primary key, auto-increment       | Read-only; assigned by the database.                   |
 | `status`      | string(20)     | **required**                      | e.g. `active`, `inactive`.                             |
 | `trap_id`     | string(50)     | **required**, **unique**          | Business identifier; duplicates return `409`.          |
-| `tracker_id`  | string(50)     | **required**                      | Associated tracker identifier.                         |
+| `tracker_id`  | string(50)     | optional                          | Linked tracker device EUI (empty allowed; UI offers a dropdown). |
 | `location`    | string(50)     | optional                          |                                                        |
 | `door_status` | string(20)     | optional                          | e.g. `open`, `closed`; typically set by sensors.       |
 | `temperature` | numeric(5,2)   | optional                          | Numeric; serialized as a JSON number.                  |
@@ -196,7 +250,7 @@ sensors update `door_status` or `location`.
 | ------ | ----------------- | --------------------------------------------------- |
 | GET    | `/api/traps`      | List traps. Query: `limit` (default 100), `offset` (default 0), `status` filter. |
 | GET    | `/api/traps/<id>` | Get a single trap by numeric `id`.                  |
-| POST   | `/api/traps`      | Create a trap. Requires `status`, `trap_id`, `tracker_id`. |
+| POST   | `/api/traps`      | Create a trap. Requires `status`, `trap_id`. |
 | PUT    | `/api/traps/<id>` | Update a trap. Requires `updated_by` in the body.   |
 | DELETE | `/api/traps/<id>` | Delete a trap.                                       |
 
@@ -215,7 +269,7 @@ Error responses are JSON of the form `{"error": "<message>"}`.
 
 ### Validation rules
 
-- `status`, `trap_id`, `tracker_id` are required on create (`400` if missing).
+- `status`, `trap_id` are required on create (`400` if missing).
 - `trap_id` must be unique (`409` on duplicate, on both create and update).
 - `updated_by` is required on every update (`400` if missing/empty); on create it
   defaults to `system` when omitted.

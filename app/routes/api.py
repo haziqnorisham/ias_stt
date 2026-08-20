@@ -42,7 +42,11 @@ def telemetry_ingest():
     try:
         from app.services.data_processor import process_message
 
-        process_message(request.full_path or "/api/telemetry/ingest", raw)
+        process_message(
+            request.path or "/api/telemetry/ingest",
+            raw,
+            source="http",
+        )
     except Exception:
         current_app.logger.exception("Error while handling HTTP telemetry ingest")
         return jsonify({"error": "Internal Server Error"}), 500

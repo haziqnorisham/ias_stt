@@ -23,6 +23,8 @@ tags:
     description: API key verification
   - name: Telemetry
     description: Decoded GPS tracker payload ingest (ChirpStack HTTP integration)
+  - name: Uplinks
+    description: Historical uplinks received from registered tracker devices
   - name: Traps
     description: Trap device CRUD
   - name: Deployments
@@ -128,6 +130,65 @@ paths:
           $ref: '#/components/responses/400'
         401:
           $ref: '#/components/responses/401'
+
+  # -- Uplink history ---------------------------------------------------------
+  /api/uplinks:
+    get:
+      tags: [Uplinks]
+      summary: List stored tracker uplinks
+      description: |
+        Returns persisted uplinks from registered tracker devices, newest
+        first. The raw payload is excluded from list results; use the detail
+        endpoint to retrieve it.
+      operationId: listUplinks
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+        - name: device_eui
+          in: query
+          schema: { type: string, maxLength: 100 }
+          description: Filter by tracker device EUI
+        - name: source
+          in: query
+          schema: { type: string, enum: [http, mqtt] }
+          description: Filter by ingestion source
+      responses:
+        200:
+          description: Stored uplinks, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrackerUplink'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+
+  /api/uplinks/{uplink_id}:
+    parameters:
+      - name: uplink_id
+        in: path
+        required: true
+        schema: { type: integer }
+        description: Uplink primary key ID
+    get:
+      tags: [Uplinks]
+      summary: Get one stored tracker uplink
+      description: Includes the original decoded JSON payload.
+      operationId: getUplink
+      responses:
+        200:
+          description: Stored uplink details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrackerUplinkDetail'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
 
   # -- Traps -----------------------------------------------------------------
   /api/traps:
@@ -610,6 +671,29 @@ components:
             battery:     { type: integer }
       required: [deviceInfo]
 
+    TrackerUplink:
+      type: object
+      properties:
+        id:           { type: integer, readOnly: true }
+        device_eui:   { type: string, maxLength: 100 }
+        display_name: { type: string, nullable: true }
+        received_at:  { type: string, format: date-time }
+        source:       { type: string, enum: [http, mqtt] }
+        topic:        { type: string, nullable: true }
+        latitude:     { type: number, format: float, nullable: true }
+        longitude:    { type: number, format: float, nullable: true }
+        tilt_status:  { type: string, nullable: true }
+        battery:      { type: integer, nullable: true }
+      required: [id, device_eui, received_at, source]
+
+    TrackerUplinkDetail:
+      allOf:
+        - $ref: '#/components/schemas/TrackerUplink'
+        - type: object
+          properties:
+            raw_payload: { type: string }
+          required: [raw_payload]
+
     Trap:
       type: object
       properties:
@@ -627,20 +711,19 @@ components:
       required:
         - status
         - trap_id
-        - tracker_id
 
     TrapCreate:
       type: object
       properties:
         status:            { type: string, enum: [active, inactive] }
         trap_id:           { type: string, maxLength: 50 }
-        tracker_id:        { type: string, maxLength: 50 }
+        tracker_id:        { type: string, maxLength: 50, description: Device EUI of an existing tracker; may be omitted/empty. }
         location:          { type: string, maxLength: 50 }
         door_status:       { type: string, maxLength: 20 }
         temperature:       { type: number, format: float }
         notes:             { type: string, maxLength: 255 }
         updated_by:        { type: string, maxLength: 50 }
-      required: [status, trap_id, tracker_id]
+      required: [status, trap_id]
 
     TrapUpdate:
       type: object

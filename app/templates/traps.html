@@ -107,8 +107,8 @@
             <div class="col-md-4">
               <label class="form-label">Status <span class="text-danger">*</span></label>
               <select class="form-select" id="f_status" required>
+                <option value="inactive" selected>inactive</option>
                 <option value="active">active</option>
-                <option value="inactive">inactive</option>
               </select>
             </div>
             <div class="col-md-4">
@@ -116,8 +116,10 @@
               <input type="text" class="form-control" id="f_trap_id" maxlength="50" required />
             </div>
             <div class="col-md-4">
-              <label class="form-label">Tracker ID <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="f_tracker_id" maxlength="50" required />
+              <label class="form-label">Tracker ID</label>
+              <select class="form-select" id="f_tracker_id">
+                <option value="">— No tracker —</option>
+              </select>
             </div>
             <div class="col-md-4">
               <label class="form-label">Location</label>

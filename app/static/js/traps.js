@@ -1,6 +1,7 @@
 "use strict";
 
 const API = "/api/traps";
+const TRACKERS_API = "/api/stt";
 const STORAGE_KEY = "api_key";
 
 function getApiKey() {
@@ -58,7 +59,9 @@ function fmtTs(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d)) return iso;
-  return d.toLocaleString();
+  return d.toLocaleString(undefined, {
+    timeZone: window.APP_TIMEZONE || "Asia/Kuala_Lumpur",
+  });
 }
 
 async function api(path, options = {}) {
@@ -187,13 +190,66 @@ function rowHtml(r) {
 // ----------------------------------------------------------------------------
 // Add / Edit
 // ----------------------------------------------------------------------------
+let trackersCache = null;
+
+async function fetchAllTrackers() {
+  if (trackersCache) return trackersCache;
+  const limit = 100;
+  const trackers = [];
+  let offset = 0;
+  while (true) {
+    const { ok, body } = await api(
+      `${TRACKERS_API}?limit=${limit}&offset=${offset}`
+    );
+    if (!ok || !Array.isArray(body) || body.length === 0) break;
+    trackers.push(...body);
+    if (body.length < limit) break;
+    offset += limit;
+  }
+  trackersCache = trackers;
+  return trackers;
+}
+
+async function loadTrackerOptions(selectedEui) {
+  const sel = document.getElementById("f_tracker_id");
+  // Keep the currently selected value if it's not in the tracker list
+  // (e.g. an existing trap whose tracker was deleted).
+  const current = sel.value;
+  const trackers = await fetchAllTrackers();
+
+  const byEui = new Map();
+  for (const t of trackers) byEui.set(t.device_eui, t);
+  const selected = selectedEui || current || "";
+  if (selected && !byEui.has(selected)) {
+    byEui.set(selected, { device_eui: selected, display_name: "" });
+  }
+
+  const list = Array.from(byEui.values()).sort((a, b) =>
+    String(a.display_name || a.device_eui).localeCompare(
+      String(b.display_name || b.device_eui)
+    )
+  );
+
+  let html = '<option value="">— No tracker —</option>';
+  for (const t of list) {
+    const label = t.display_name
+      ? `${escapeHtml(t.device_eui)} (${escapeHtml(t.display_name)})`
+      : escapeHtml(t.device_eui);
+    const selAttr = t.device_eui === selected ? " selected" : "";
+    html += `<option value="${escapeHtml(t.device_eui)}"${selAttr}>${label}</option>`;
+  }
+  sel.innerHTML = html;
+  sel.value = selected || "";
+}
+
 function openAdd() {
   document.getElementById("trapForm").reset();
   document.getElementById("trapPk").value = "";
   document.getElementById("trapModalTitle").textContent = "Add Trap";
   document.getElementById("updatedByReq").style.display = "none";
   document.getElementById("f_updated_by").required = false;
-  document.getElementById("f_status").value = "active";
+  document.getElementById("f_status").value = "inactive";
+  loadTrackerOptions("");
   trapModal.show();
 }
 
@@ -205,7 +261,6 @@ window.editTrap = function (id) {
   document.getElementById("trapModalTitle").textContent = `Edit Trap #${r.id}`;
   document.getElementById("f_status").value = r.status || "active";
   document.getElementById("f_trap_id").value = r.trap_id || "";
-  document.getElementById("f_tracker_id").value = r.tracker_id || "";
   document.getElementById("f_location").value = r.location || "";
   document.getElementById("f_door_status").value = r.door_status || "";
   document.getElementById("f_temperature").value = r.temperature ?? "";
@@ -213,6 +268,7 @@ window.editTrap = function (id) {
   document.getElementById("f_updated_by").value = "";
   document.getElementById("updatedByReq").style.display = "";
   document.getElementById("f_updated_by").required = true;
+  loadTrackerOptions(r.tracker_id || "");
   trapModal.show();
 };
 
@@ -242,8 +298,8 @@ async function submitForm(e) {
   if (updatedBy) payload.updated_by = updatedBy;
 
   // Client-side validation
-  if (!payload.status || !payload.trap_id || !payload.tracker_id) {
-    toast("Status, Trap ID and Tracker ID are required.", "error");
+  if (!payload.status || !payload.trap_id) {
+    toast("Status and Trap ID are required.", "error");
     return;
   }
   if (isEdit && !updatedBy) {
@@ -422,6 +478,9 @@ document.addEventListener("DOMContentLoaded", () => {
     state.offset += state.limit;
     loadTraps();
   });
+
+  // Warm the tracker cache so the Add/Edit dropdown is ready immediately.
+  fetchAllTrackers();
 
   document.querySelectorAll("th.sortable").forEach((th) => {
     th.addEventListener("click", () => {

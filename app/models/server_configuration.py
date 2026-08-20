@@ -1,6 +1,7 @@
 # app/models/geofencing.py
 from app.models.database import db
 from app.models.deployment_location import _utcnow
+from app.time_utils import format_app_datetime
 
 class server_configuration(db.Model):
     __tablename__ = "server_configuration"
@@ -18,6 +19,6 @@ class server_configuration(db.Model):
             "id": self.id,
             "config_key": self.config_key,
             "value": self.value,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": format_app_datetime(self.created_at),
+            "updated_at": format_app_datetime(self.updated_at),
         }

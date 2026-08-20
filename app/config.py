@@ -1,6 +1,7 @@
 """Application configuration loaded from environment variables."""
 import os
 import uuid
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
 
@@ -39,6 +40,15 @@ def _parse_topics(raw: str) -> list:
     return topics
 
 
+def _env_timezone(name: str, default: str) -> str:
+    value = os.getenv(name, default).strip()
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError):
+        return default
+    return value
+
+
 class Config:
     """Base configuration loaded from environment variables."""
 
@@ -54,6 +64,7 @@ class Config:
     # Logging
     LOG_DIR = os.getenv("LOG_DIR", "logs")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
+    APP_TIMEZONE = _env_timezone("APP_TIMEZONE", "Asia/Kuala_Lumpur")
 
     # Frontend
     ENABLE_FRONTEND = _env_bool("ENABLE_FRONTEND", True)

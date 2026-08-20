@@ -6,13 +6,15 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask, jsonify
 
 from app.config import Config
+from app.time_utils import AppTimezoneFormatter
 
 
 def _configure_logging(app: Flask) -> None:
     os.makedirs(app.config["LOG_DIR"], exist_ok=True)
 
-    log_format = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s %(module)s:%(lineno)d - %(message)s"
+    log_format = AppTimezoneFormatter(
+        "%(asctime)s [%(levelname)s] %(name)s %(module)s:%(lineno)d - %(message)s",
+        timezone_name=app.config["APP_TIMEZONE"],
     )
     level = getattr(logging, app.config["LOG_LEVEL"].upper(), logging.DEBUG)
 
@@ -70,6 +72,7 @@ def create_app(config_class: type = Config) -> Flask:
         from app.models.deployment import Deployment  # noqa: F401
         from app.models.deployment_location import DeploymentLocation  # noqa: F401
         from app.models.smart_trap_tracker import SmartTrapTracker  # noqa: F401
+        from app.models.tracker_uplink import TrackerUplink  # noqa: F401
         from app.models.trap import Trap  # noqa: F401  (register model)
         from app.models.server_configuration import server_configuration  # noqa: F401  (register model)
 
@@ -79,12 +82,14 @@ def create_app(config_class: type = Config) -> Flask:
     from app.routes.traps import traps_bp
     from app.routes.deployments import deployments_bp
     from app.routes.trackers import trackers_bp
+    from app.routes.uplinks import uplinks_bp
     from app.routes.server_configuration import server_configuration_bp
 
     app.register_blueprint(api_bp)
     app.register_blueprint(traps_bp)
     app.register_blueprint(deployments_bp)
     app.register_blueprint(trackers_bp)
+    app.register_blueprint(uplinks_bp)
     app.register_blueprint(server_configuration_bp)
 
     if app.config["ENABLE_FRONTEND"]:

@@ -6,6 +6,7 @@ from flask import Blueprint, current_app, jsonify, request
 from app.auth import require_api_key
 from app.models.database import db
 from app.models.server_configuration import server_configuration
+from app.time_utils import format_app_datetime
 
 server_configuration_bp = Blueprint("server_configuration", __name__, url_prefix="/api/server_configuration")
 
@@ -43,9 +44,9 @@ def create_server_configuration():
             db.session.add(existing_row)
 
         elif "config_key" in data:
+            config_group = data.get("config_key")
             if not isinstance(config_group, dict):
                 return jsonify({"error": "Expected 'config_key' payload to be an object"}), 400
-            config_group = data.get("config_key")
 
             for config_type, payload in config_group.items():
                 if not isinstance(payload, dict):
@@ -105,8 +106,8 @@ def get_server_configuration():
                     "id": config.id,
                     "config_key": config.config_key,
                     "value": config.value,
-                    "created_at": config.created_at.isoformat() if config.created_at else None,
-                    "updated_at": config.updated_at.isoformat() if config.updated_at else None,
+                    "created_at": format_app_datetime(config.created_at),
+                    "updated_at": format_app_datetime(config.updated_at),
                 }
             )
 
@@ -119,8 +120,8 @@ def get_server_configuration():
                     "id": config.id,
                     "config_key": config.config_key,
                     "value": config.value,
-                    "created_at": config.created_at.isoformat() if config.created_at else None,
-                    "updated_at": config.updated_at.isoformat() if config.updated_at else None,
+                    "created_at": format_app_datetime(config.created_at),
+                    "updated_at": format_app_datetime(config.updated_at),
                 }
             )
 

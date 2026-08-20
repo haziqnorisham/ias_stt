@@ -1,4 +1,4 @@
-"""MQTT message processing — currently log-only; hook for future logic."""
+"""Decode, persist, and process tracker telemetry from MQTT or HTTP."""
 import json
 import logging
 from geopy.distance import geodesic
@@ -7,8 +7,16 @@ from app.models.trap import Trap
 from app.models.database import db
 from app.models.server_configuration import server_configuration
 from app.models.smart_trap_tracker import SmartTrapTracker
+from app.models.tracker_uplink import TrackerUplink
 
 logger = logging.getLogger("app.data_processor")
+
+FIELD_MAP = {
+    "latitude": "latitude",
+    "longitude": "longitude",
+    "position": "tilt_status",
+    "battery": "battery",
+}
 
 
 def device_exists(dev_eui):
@@ -38,33 +46,9 @@ def _apply_inbound_update(data, dev_eui):
         )
         return
     
-    obj = data.get("object", {})
-    if not isinstance(obj, dict) or not obj:
+    updates = _parse_sensor_updates(data)
+    if not updates:
         return
-
-    FIELD_MAP = {
-        "latitude": "latitude",
-        "longitude": "longitude",
-        "position": "tilt_status",
-        "battery": "battery",
-    }
-
-    updates = {}
-    for mqtt_key, col in FIELD_MAP.items():
-        if mqtt_key not in obj:
-            continue
-        value = obj[mqtt_key]
-        if col == "battery":
-            try:
-                value = int(value)
-            except (ValueError, TypeError):
-                continue
-        elif col in ("latitude", "longitude"):
-            try:
-                value = float(value)
-            except (ValueError, TypeError):
-                continue
-        updates[col] = value
 
     latitude = updates.get("latitude")
     longitude = updates.get("longitude")
@@ -162,18 +146,18 @@ def _create_new_deployment(dev_eui, latitude, longitude):
     if not trap:
         # no trap known for this device
         logger.info("No Trap found for tracker_id=%s", dev_eui)
-        deployment_status = None
-    else:
-        deployment_status = trap.get_active_deployment()  # Deployment or None
-        logger.info(
-            "Found Trap id=%s tracker_id=%s active_deployment=%s",
-            trap.id,
-            trap.tracker_id,
-            trap.status,
-            getattr(deployment_status, "id", None),
-        )
+        return
 
-        trap_status = trap.status if trap else "unknown"
+    deployment_status = trap.get_active_deployment()  # Deployment or None
+    logger.info(
+        "Found Trap id=%s tracker_id=%s status=%s active_deployment=%s",
+        trap.id,
+        trap.tracker_id,
+        trap.status,
+        getattr(deployment_status, "id", None),
+    )
+
+    trap_status = trap.status
 
     """Determine the action to take based on the geofence status and deployment status.
        Added trap status updates active/inactive on the traps table.
@@ -237,8 +221,57 @@ def _notify_trap_closed(dev_eui):
     notify_if_trap_closed(dev_eui)
 
 
-def process_message(topic, payload):
-    """Single entry-point for every incoming MQTT message.
+def _parse_sensor_updates(data):
+    """Return validated tracker-column values from a decoded payload."""
+    obj = data.get("object", {})
+    if not isinstance(obj, dict) or not obj:
+        return {}
+
+    updates = {}
+    for payload_key, column in FIELD_MAP.items():
+        if payload_key not in obj:
+            continue
+        value = obj[payload_key]
+        if column == "battery":
+            try:
+                value = int(value)
+            except (ValueError, TypeError):
+                continue
+        elif column in ("latitude", "longitude"):
+            try:
+                value = float(value)
+            except (ValueError, TypeError):
+                continue
+        updates[column] = value
+    return updates
+
+
+def _store_uplink(data, dev_eui, topic, payload, source):
+    """Persist one known-device uplink without writing it to application logs."""
+    updates = _parse_sensor_updates(data)
+    raw_payload = payload if isinstance(payload, str) else json.dumps(data)
+    uplink = TrackerUplink(
+        device_eui=dev_eui,
+        source=source,
+        topic=topic,
+        latitude=updates.get("latitude"),
+        longitude=updates.get("longitude"),
+        tilt_status=updates.get("tilt_status"),
+        battery=updates.get("battery"),
+        raw_payload=raw_payload,
+    )
+    db.session.add(uplink)
+    db.session.commit()
+    logger.info(
+        "Stored uplink #%s for device %s (source=%s)",
+        uplink.id,
+        dev_eui,
+        source,
+    )
+
+
+def process_message(topic, payload, source="mqtt"):
+    """Single entry-point for every incoming MQTT or HTTP message.
 
     Attempts to parse *payload* as JSON. Invalid payloads are logged at ERROR
     level and discarded; valid messages are logged as a one-line summary
@@ -250,12 +283,22 @@ def process_message(topic, payload):
         logger.error("Invalid JSON payload received on topic '%s'", topic)
         return
 
-    dev_eui = data.get("deviceInfo", {}).get("devEui")
+    if not isinstance(data, dict):
+        logger.error("JSON payload received on topic '%s' is not an object", topic)
+        return
+
+    device_info = data.get("deviceInfo", {})
+    dev_eui = (
+        device_info.get("devEui")
+        if isinstance(device_info, dict)
+        else None
+    )
     if dev_eui:
         logger.info("deviceEui: %s", dev_eui)
         known = device_exists(dev_eui)
         logger.info("device_exists('%s') → %s", dev_eui, known)
         if known:
+            _store_uplink(data, dev_eui, topic, payload, source)
             _apply_inbound_update(data, dev_eui)
     else:
         logger.warning(

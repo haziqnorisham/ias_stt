@@ -1,8 +1,39 @@
-/* SB Admin 2-style layout behaviour — vanilla JS, no jQuery. */
+/* Layout behaviour — vanilla JS, no jQuery. */
 
 (function () {
   "use strict";
 
+  // --- Theme toggle (dark is default; preference persisted per browser) ---
+  var THEME_KEY = "ias-theme";
+  var themeToggle = document.getElementById("themeToggle");
+
+  function currentTheme() {
+    return document.documentElement.getAttribute("data-bs-theme") === "light"
+      ? "light"
+      : "dark";
+  }
+
+  function renderThemeIcon() {
+    if (!themeToggle) return;
+    var icon = themeToggle.querySelector("i");
+    if (icon) {
+      icon.className = currentTheme() === "dark" ? "bi bi-sun" : "bi bi-moon";
+    }
+  }
+
+  if (themeToggle) {
+    themeToggle.addEventListener("click", function () {
+      var next = currentTheme() === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-bs-theme", next);
+      try {
+        localStorage.setItem(THEME_KEY, next);
+      } catch (e) {}
+      renderThemeIcon();
+    });
+    renderThemeIcon();
+  }
+
+  // --- Sidebar ---
   var toggle = document.getElementById("sidebarToggle");
   if (!toggle) return;
 

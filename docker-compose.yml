@@ -9,6 +9,7 @@ services:
       - .env
     environment:
       - FLASK_ENV=production
+      - TZ=${APP_TIMEZONE:-Asia/Kuala_Lumpur}
       - UWSGI_PROCESSES=${UWSGI_PROCESSES:-2}
       - UWSGI_THREADS=${UWSGI_THREADS:-2}
     volumes:

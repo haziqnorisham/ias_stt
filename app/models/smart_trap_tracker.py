@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 
 from app.models.database import db
+from app.time_utils import format_app_datetime
 
 
 def _utcnow():
@@ -32,12 +33,8 @@ class SmartTrapTracker(db.Model):
             "longitude": float(self.longitude) if self.longitude is not None else None,
             "tilt_status": self.tilt_status,
             "battery": self.battery,
-            "created_date": self.created_date.isoformat()
-            if self.created_date
-            else None,
-            "updated_date": self.updated_date.isoformat()
-            if self.updated_date
-            else None,
+            "created_date": format_app_datetime(self.created_date),
+            "updated_date": format_app_datetime(self.updated_date),
         }
 
     def __repr__(self):

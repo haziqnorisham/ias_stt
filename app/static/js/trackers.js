@@ -41,7 +41,9 @@ function fmtTs(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d)) return iso;
-  return d.toLocaleString();
+  return d.toLocaleString(undefined, {
+    timeZone: window.APP_TIMEZONE || "Asia/Kuala_Lumpur",
+  });
 }
 
 async function api(path, options = {}) {

@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 
 from app.models.database import db
+from app.time_utils import format_app_datetime
 
 
 def _utcnow():
@@ -25,9 +26,9 @@ class DeploymentLocation(db.Model):
             "id": self.id,
             "deployment_id": self.deployment_id,
             "location": self.location,
-            "recorded_at": self.recorded_at.isoformat() if self.recorded_at else None,
+            "recorded_at": format_app_datetime(self.recorded_at),
             "notes": self.notes,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": format_app_datetime(self.created_at),
         }
 
     def __repr__(self):
