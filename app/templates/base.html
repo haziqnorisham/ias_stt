@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Trap Management{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/sb-admin-2.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  <div id="wrapper">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <a class="sidebar-brand" href="/traps">
+        <img src="{{ url_for('static', filename='images/ias-1.png') }}" alt="IAS logo" />
+        <span>IAS&nbsp;STT</span>
+      </a>
+      <hr class="sidebar-divider" />
+
+      <div class="sidebar-heading">Management</div>
+      <ul class="nav flex-column">
+        <li class="nav-item {% if active_page == 'traps' %}active{% endif %}">
+          <a class="nav-link" href="/traps"><i class="bi bi-bug-fill"></i><span>Traps</span></a>
+        </li>
+        <li class="nav-item {% if active_page == 'trackers' %}active{% endif %}">
+          <a class="nav-link" href="/trackers"><i class="bi bi-geo-alt-fill"></i><span>Trackers</span></a>
+        </li>
+        <li class="nav-item {% if active_page == 'deployments' %}active{% endif %}">
+          <a class="nav-link" href="/deployments"><i class="bi bi-clock-history"></i><span>Deployments</span></a>
+        </li>
+      </ul>
+
+      <hr class="sidebar-divider" />
+
+      <div class="sidebar-heading">Field</div>
+      <ul class="nav flex-column">
+        <li class="nav-item {% if active_page == 'mobile' %}active{% endif %}">
+          <a class="nav-link" href="/mobile"><i class="bi bi-phone"></i><span>Mobile</span></a>
+        </li>
+      </ul>
+
+      <div class="sidebar-copy">Smart Trap Tracking v1.0</div>
+    </aside>
+
+    <!-- Content wrapper -->
+    <div id="content-wrapper">
+      <!-- Topbar -->
+      <nav class="navbar topbar">
+        <button type="button" id="sidebarToggle" aria-label="Toggle navigation">
+          <i class="bi bi-list"></i>
+        </button>
+        <h1 class="topbar-title">{% block page_title %}Trap Management{% endblock %}</h1>
+        <div class="topbar-nav">
+          <span id="recordCount" class="d-none d-md-inline"></span>
+          <hr class="topbar-divider d-none d-md-block" />
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                 data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="d-none d-md-inline text-gray-600">Operator</span>
+                <img class="img-profile rounded-circle"
+                     src="{{ url_for('static', filename='images/ias-1.png') }}" alt="user" />
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end shadow animated--grow-in" aria-labelledby="userDropdown">
+                <li><h6 class="dropdown-header">Account</h6></li>
+                <li><a class="dropdown-item" href="/traps"><i class="bi bi-speedometer2"></i> Traps</a></li>
+                <li><hr class="dropdown-divider" /></li>
+                <li><button type="button" class="dropdown-item" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Logout</button></li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <!-- Page content -->
+      <main id="content" class="container-fluid">
+        <div class="page-heading d-sm-flex align-items-center justify-content-between">
+          <div>
+            <h1>{% block page_heading %}Traps{% endblock %}</h1>
+            <nav aria-label="breadcrumb">
+              <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/traps">Home</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{% block breadcrumb_active %}Traps{% endblock %}</li>
+              </ol>
+            </nav>
+          </div>
+          {% block page_heading_actions %}{% endblock %}
+        </div>
+
+        {% block content %}{% endblock %}
+      </main>
+
+      <!-- Footer -->
+      <footer class="sticky-footer">
+        <span>IAS Smart Trap Tracking</span>
+        <span>{% block footer_right %}Smart Trap Tracker Server{% endblock %}</span>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+
+  {% block modals %}{% endblock %}
+
+  <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/layout.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

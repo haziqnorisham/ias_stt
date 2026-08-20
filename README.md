@@ -301,8 +301,9 @@ A Jinja2 + Bootstrap single-page interface for managing traps, served at
 Disable it by setting `ENABLE_FRONTEND=false`, after which `/traps` returns
 `404` while the JSON API at `/api/traps` keeps working.
 
-> The UI loads Bootstrap 5 and Bootstrap Icons from a CDN, so the page needs
-> internet access when first loaded.
+> The UI uses an SB Admin 2-style layout with Bootstrap 5 and Bootstrap Icons
+> vendored locally under `app/static/vendor/`, so no internet access is required
+> at runtime.
 
 ## Authentication
 
