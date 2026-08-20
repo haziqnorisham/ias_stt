@@ -240,15 +240,14 @@ def _notify_trap_closed(dev_eui):
 def process_message(topic, payload):
     """Single entry-point for every incoming MQTT message.
 
-    Attempts to parse *payload* as JSON. Valid JSON is pretty-printed at INFO
-    level; invalid payloads are logged at ERROR level and discarded.
+    Attempts to parse *payload* as JSON. Invalid payloads are logged at ERROR
+    level and discarded; valid messages are logged as a one-line summary
+    (the raw payload is never written to the logs).
     """
     try:
         data = json.loads(payload)
     except (json.JSONDecodeError, TypeError, ValueError):
-        logger.error(
-            "Invalid JSON payload received on topic '%s': %s", topic, payload
-        )
+        logger.error("Invalid JSON payload received on topic '%s'", topic)
         return
 
     dev_eui = data.get("deviceInfo", {}).get("devEui")
@@ -263,6 +262,4 @@ def process_message(topic, payload):
             "deviceEui not found in payload on topic '%s'", topic
         )
 
-    logger.info(
-        "Topic: %s\nParsed JSON:\n%s", topic, json.dumps(data, indent=2)
-    )
+    logger.info("Processed message on topic '%s' (devEui=%s)", topic, dev_eui)

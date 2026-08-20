@@ -155,7 +155,7 @@ def update_trap(trap_pk):
         return _error("Request body must be a JSON object", 400)
 
     current_app.logger.info(
-        "PUT /api/traps/%s payload: %s", trap_pk, data
+        "PUT /api/traps/%s received (%d field(s))", trap_pk, len(data)
     )
 
     if not data.get("updated_by"):

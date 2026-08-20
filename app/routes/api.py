@@ -1,4 +1,6 @@
 """API routes: public Hello World plus the auth verification endpoint."""
+import json
+
 from app.models.server_configuration import server_configuration
 from flask import Blueprint, current_app, jsonify, request, redirect
 from sqlalchemy import select
@@ -20,6 +22,32 @@ def root_to_traps():
 @api_bp.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"}), 200
+
+
+@api_bp.route("/api/telemetry/ingest", methods=["POST"])
+@require_api_key
+def telemetry_ingest():
+    """Receive decoded GPS tracker payloads pushed by ChirpStack's HTTP integration.
+
+    The body must be the ChirpStack JSON envelope (``deviceInfo`` + ``object``).
+    Processing is identical to the MQTT path via :func:`process_message`.
+    """
+    raw = request.get_data(as_text=True)
+    try:
+        json.loads(raw)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        current_app.logger.error("Invalid JSON payload received via HTTP ingest")
+        return jsonify({"error": "Invalid JSON payload"}), 400
+
+    try:
+        from app.services.data_processor import process_message
+
+        process_message(request.full_path or "/api/telemetry/ingest", raw)
+    except Exception:
+        current_app.logger.exception("Error while handling HTTP telemetry ingest")
+        return jsonify({"error": "Internal Server Error"}), 500
+
+    return jsonify({"status": "processed"}), 200
 
 
 @api_bp.route("/api/auth/verify", methods=["GET"])

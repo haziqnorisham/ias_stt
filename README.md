@@ -1,15 +1,19 @@
-# MQTT to PostgreSQL Pipeline — Backend API Service
+# Trap Management Service — Backend API Service
 
-Flask-based backend that ingests MQTT data, stores device configuration, and
-exposes a REST API plus a web UI for managing traps.
+Flask-based backend that ingests device telemetry (pushed by the ChirpStack
+HTTP integration), stores device configuration, and exposes a REST API plus a
+web UI for managing traps.
 
 ## Implemented features
 
 - **Flask app** with application factory, rotating file + console logging, and
   JSON error handlers.
-- **MQTT monitoring** (paho-mqtt 2.x) — background, non-blocking client with
-  auto-reconnect/backoff, resubscribe-on-connect, and console logging of every
-  received message. Toggle with `MQTT_ENABLED`.
+- **HTTP telemetry ingest** at `POST /api/telemetry/ingest` — receives decoded
+  GPS tracker payloads from ChirpStack's HTTP integration and runs the shared
+  processing pipeline (tracker update, geofence + deployment logic).
+- **MQTT monitoring** (paho-mqtt 2.x, optional, off by default) — background,
+  non-blocking client with auto-reconnect/backoff, resubscribe-on-connect, and
+  console logging of every received message. Toggle with `MQTT_ENABLED`.
 - **SQLite trap store** (SQLAlchemy) with a `traps` table created on startup.
 - **REST CRUD API** at `/api/traps` (list/get/create/update/delete) with
   validation and proper status codes.
@@ -77,7 +81,7 @@ curl http://localhost:5000/
 ## API documentation (OpenAPI)
 
 An `openapi.yaml` specification is included in the project root covering all
-19 endpoints, data models, and authentication. Import it into **Bruno**:
+20 endpoints, data models, and authentication. Import it into **Bruno**:
 
 1. Open Bruno → *Collections* → *Import Collection*
 2. Choose **OpenAPI v3** → select `openapi.yaml`
@@ -98,7 +102,7 @@ Config is read from environment variables (see `.env.example`).
 | `ENABLE_FRONTEND`  | `true`        | Serve the `/traps` UI; `false` → 404.        |
 | `API_KEY`          | — (unset)     | Secret for `/api/*` + UI login. Unset → auth disabled (warning logged). |
 | `DATABASE_URL`     | `sqlite:///data/traps.db` | SQLAlchemy database URL.         |
-| `MQTT_ENABLED`     | `true`        | Start the MQTT client.                       |
+| `MQTT_ENABLED`     | `false`       | Start the MQTT client (optional; HTTP ingest is the default). |
 | `MQTT_BROKER_HOST` | `localhost`   | MQTT broker host.                            |
 | `MQTT_BROKER_PORT` | `1883`        | MQTT broker port.                            |
 | `MQTT_TOPICS`      | —             | Comma-separated topic filters.               |
@@ -106,6 +110,50 @@ Config is read from environment variables (see `.env.example`).
 | `MQTT_USERNAME`    | —             | Optional broker username.                    |
 | `MQTT_PASSWORD`    | —             | Optional broker password.                    |
 | `MQTT_KEEPALIVE`   | `60`          | Keepalive seconds.                           |
+
+## Telemetry ingestion (`POST /api/telemetry/ingest`)
+
+Decoded GPS tracker payloads are pushed to this endpoint by **ChirpStack's HTTP
+integration**. The body must be the standard ChirpStack JSON envelope
+(`deviceInfo` + `object`); processing is identical to the (optional) MQTT path:
+
+1. `deviceInfo.devEui` is looked up in `smart_trap_tracker`; **unknown devices
+   are silently ignored** and the endpoint still returns `200` (matching the
+   former MQTT behaviour).
+2. `object.latitude` / `object.longitude` / `object.position` / `object.battery`
+   are persisted to the tracker row.
+3. The geofence check and deployment/trap-status logic run when coordinates
+   are present.
+
+> **Auth:** when `API_KEY` is set, the request must include
+> `Authorization: Bearer <API_KEY>` — the ChirpStack HTTP integration supports
+> custom headers.
+
+### ChirpStack v4 setup
+
+1. In ChirpStack: *Application → Integrations → HTTP* → **Add integration**.
+2. Payload encoding: **JSON**, event endpoint URL:
+   `http://<host>:<port>/api/telemetry/ingest`
+3. Add a custom header: `Authorization: Bearer <your-api-key>`.
+
+### Example
+
+```bash
+curl -X POST http://localhost:5000/api/telemetry/ingest \
+  -H 'Authorization: Bearer your-secret-key' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "deviceInfo": { "devEui": "a1b2c3d4e5f6a7b8", "deviceName": "trap-tracker-01" },
+    "object": { "latitude": -1.2921, "longitude": 36.8219, "position": "normal", "battery": 95 }
+  }'
+# -> 200 {"status": "processed"}
+```
+
+| Code  | Meaning                                              |
+| ----- | --------------------------------------------------- |
+| `200` | Payload accepted and processed (unknown devEui included). |
+| `400` | Body is not valid JSON.                              |
+| `401` | Missing/invalid API key (when `API_KEY` is set).     |
 
 ## Trap configuration API (`/api/traps`)
 

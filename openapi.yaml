@@ -3,9 +3,11 @@ info:
   title: ias_stt — Trap Management API
   version: 1.0.0
   description: |
-    MQTT-backed trap management service with deployment tracking,
-    location history, and photo upload. All `/api/*` endpoints
-    require a Bearer token (`API_KEY` from the environment).
+    Trap management service with deployment tracking, location
+    history, and photo upload. Telemetry is ingested from the
+    ChirpStack HTTP integration via `POST /api/telemetry/ingest`
+    (an optional MQTT listener remains available). All `/api/*`
+    endpoints require a Bearer token (`API_KEY` from the environment).
 
 servers:
   - url: http://localhost:8080
@@ -19,6 +21,8 @@ tags:
     description: Public service health checks
   - name: Auth
     description: API key verification
+  - name: Telemetry
+    description: Decoded GPS tracker payload ingest (ChirpStack HTTP integration)
   - name: Traps
     description: Trap device CRUD
   - name: Deployments
@@ -76,6 +80,52 @@ paths:
                     type: boolean
               example:
                 ok: true
+        401:
+          $ref: '#/components/responses/401'
+
+  # -- Telemetry -------------------------------------------------------------
+  /api/telemetry/ingest:
+    post:
+      tags: [Telemetry]
+      summary: Ingest a decoded GPS tracker payload
+      description: |
+        Receives the ChirpStack JSON uplink envelope pushed by the
+        ChirpStack HTTP integration. Processing is identical to the
+        (optional) MQTT path: `deviceInfo.devEui` is looked up in the
+        trackers table; unknown devices are silently ignored (still
+        `200`). `object.latitude`, `object.longitude`,
+        `object.position`, and `object.battery` update the tracker,
+        and the geofence/deployment logic runs when coordinates are
+        present.
+      operationId: telemetryIngest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryPayload'
+            example:
+              deviceInfo:
+                devEui: a1b2c3d4e5f6a7b8
+                deviceName: trap-tracker-01
+              object:
+                latitude: -1.2921
+                longitude: 36.8219
+                position: normal
+                battery: 95
+      responses:
+        200:
+          description: Payload accepted and processed (unknown devEui included)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [processed] }
+              example:
+                status: processed
+        400:
+          $ref: '#/components/responses/400'
         401:
           $ref: '#/components/responses/401'
 
@@ -541,6 +591,24 @@ components:
           enum: [ok]
       example:
         status: ok
+
+    TelemetryPayload:
+      type: object
+      description: ChirpStack decoded uplink envelope.
+      properties:
+        deviceInfo:
+          type: object
+          properties:
+            devEui:      { type: string, description: LoRaWAN device EUI; must match a tracker row. }
+            deviceName:  { type: string }
+        object:
+          type: object
+          properties:
+            latitude:    { type: number, format: float }
+            longitude:   { type: number, format: float }
+            position:    { type: string, description: Mapped to tracker tilt_status. }
+            battery:     { type: integer }
+      required: [deviceInfo]
 
     Trap:
       type: object

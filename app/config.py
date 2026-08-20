@@ -67,8 +67,8 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # MQTT
-    MQTT_ENABLED = _env_bool("MQTT_ENABLED", True)
+    # MQTT (disabled by default; telemetry is ingested via HTTP instead)
+    MQTT_ENABLED = _env_bool("MQTT_ENABLED", False)
     MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", "localhost")
     MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
     MQTT_TOPICS = _parse_topics(os.getenv("MQTT_TOPICS", ""))
