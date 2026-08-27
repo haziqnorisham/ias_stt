@@ -88,6 +88,7 @@ def create_app(config_class: type = Config) -> Flask:
     from app.routes.server_configuration import server_configuration_bp
     from app.routes.picture import picture_bp
     from app.routes.notes import note_bp
+    
 
     app.register_blueprint(api_bp)
     app.register_blueprint(traps_bp)
@@ -97,6 +98,7 @@ def create_app(config_class: type = Config) -> Flask:
     app.register_blueprint(server_configuration_bp)
     app.register_blueprint(picture_bp)
     app.register_blueprint(note_bp)
+
 
     if app.config["ENABLE_FRONTEND"]:
         from app.routes.frontend import frontend_bp

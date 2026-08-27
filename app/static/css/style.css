@@ -43,3 +43,62 @@ th.sortable.sort-desc::after {
 .actions-cell .btn {
   padding: 0.1rem 0.4rem;
 }
+
+
+
+/* Custom Scanner Containers */
+.scanner-viewport {
+  max-width: 450px;
+  min-height: 280px;
+  overflow: hidden;
+  border-radius: 8px;
+  background-color: #000000;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.result-panel {
+  max-width: 450px;
+}
+
+/* Hard-override library's automated inline styles */
+#reader {
+  border: none !important;
+  width: 100% !important;
+  min-height: 280px;
+}
+
+#reader video {
+  width: 100% !important;
+  height: auto !important;
+  object-fit: cover;
+}
+
+/* Animated Scanning Laser Overlay */
+.scanner-laser-container::after {
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  height: 3px;
+  background: linear-gradient(to right, transparent, #0d6efd, transparent);
+  box-shadow: 0 0 8px #0d6efd, 0 0 15px #0d6efd;
+  z-index: 10;
+  animation: scanning-laser 2s infinite ease-in-out;
+}
+
+@keyframes scanning-laser {
+  0% {
+    top: 15%;
+  }
+
+  50% {
+    top: 85%;
+  }
+
+  100% {
+    top: 15%;
+  }
+}

@@ -28,6 +28,7 @@
   font-display: swap;
   src: url("../vendor/inter/inter-400.woff2") format("woff2");
 }
+
 @font-face {
   font-family: "Inter";
   font-style: normal;
@@ -35,6 +36,7 @@
   font-display: swap;
   src: url("../vendor/inter/inter-500.woff2") format("woff2");
 }
+
 @font-face {
   font-family: "Inter";
   font-style: normal;
@@ -42,6 +44,7 @@
   font-display: swap;
   src: url("../vendor/inter/inter-600.woff2") format("woff2");
 }
+
 @font-face {
   font-family: "Inter";
   font-style: normal;
@@ -92,9 +95,11 @@
   --text-muted: #9aa3b2;
 
   /* Accent */
-  --accent: #7d97ff;              /* links, focus, active states on dark */
+  --accent: #7d97ff;
+  /* links, focus, active states on dark */
   --accent-hover: #93a9ff;
-  --accent-solid: #4a63ec;        /* filled primary buttons (white text AA) */
+  --accent-solid: #4a63ec;
+  /* filled primary buttons (white text AA) */
   --accent-solid-hover: #5a73f2;
   --accent-soft: rgba(125, 151, 255, 0.14);
   --accent-ring: rgba(125, 151, 255, 0.35);
@@ -249,14 +254,17 @@ body {
   width: 10px;
   height: 10px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--surface-3);
   border-radius: 8px;
   border: 2px solid var(--bg);
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border);
 }
@@ -1051,15 +1059,41 @@ body {
 }
 
 /* -- Text helpers (legacy SB Admin 2 classes, mapped to tokens) ------------- */
-.text-gray-100 { color: var(--text) !important; }
-.text-gray-200 { color: var(--text) !important; }
-.text-gray-300 { color: var(--text) !important; }
-.text-gray-400 { color: var(--text-muted) !important; }
-.text-gray-500 { color: var(--text-muted) !important; }
-.text-gray-600 { color: var(--text-muted) !important; }
-.text-gray-700 { color: var(--text) !important; }
-.text-gray-800 { color: var(--text) !important; }
-.text-gray-900 { color: var(--text) !important; }
+.text-gray-100 {
+  color: var(--text) !important;
+}
+
+.text-gray-200 {
+  color: var(--text) !important;
+}
+
+.text-gray-300 {
+  color: var(--text) !important;
+}
+
+.text-gray-400 {
+  color: var(--text-muted) !important;
+}
+
+.text-gray-500 {
+  color: var(--text-muted) !important;
+}
+
+.text-gray-600 {
+  color: var(--text-muted) !important;
+}
+
+.text-gray-700 {
+  color: var(--text) !important;
+}
+
+.text-gray-800 {
+  color: var(--text) !important;
+}
+
+.text-gray-900 {
+  color: var(--text) !important;
+}
 
 .text-muted {
   color: var(--text-muted) !important;
@@ -1157,5 +1191,43 @@ footer.sticky-footer {
 }
 
 .login-page .login-title i {
+  color: var(--accent);
+}
+
+
+/* -- Trap Assignment page ------------------------------------------------------------ */
+.trap-assignment-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: left;
+  justify-content: left;
+  padding: var(--space-5);
+}
+
+.trap-assignment-page .trap-assignment-card {
+  width: 100%;
+  max-width: 26rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.trap-assignment-page .trap-assignment-card .trap-assignment-logo {
+  display: block;
+  margin: 0 auto 0.5rem;
+  width: 5.5rem;
+  height: auto;
+}
+
+.trap-assignment-page .trap-assignment-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-align: center;
+}
+
+.trap-assignment-page .trap-assignment-title i {
   color: var(--accent);
 }

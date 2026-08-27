@@ -2,7 +2,7 @@
 import json
 
 from app.models.server_configuration import server_configuration
-from flask import Blueprint, current_app, jsonify, request, redirect
+from flask import Blueprint, current_app, jsonify, request, redirect, render_template
 from sqlalchemy import select
 
 from app.auth import require_api_key
@@ -113,3 +113,14 @@ def dashboard_map():
         result.append(item)
 
     return jsonify(result), 200
+
+
+@api_bp.route('/traps/<trap_id>')
+def render_scanned_trap(trap_id):
+    # This executes every time qr_scanner.js updates window.location.href
+    
+    context = {
+        "id": trap_id
+    }
+    
+    return render_template('tracker_assignment.html', **context)

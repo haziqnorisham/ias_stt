@@ -185,6 +185,18 @@ window.openPhotoUpload = function (depId) {
   input.click();
 };
 
+
+// ---------------------------------------------------------------------------
+// Image viewer
+// ---------------------------------------------------------------------------
+let imageViewer;
+window.openImageViewer = function (url) {
+  document.getElementById("fullImage").src = url;
+  if (!imageViewer) imageViewer = new bootstrap.Modal(document.getElementById("imageViewer"));
+  imageViewer.show();
+};
+
+
 // ---------------------------------------------------------------------------
 // Wiring
 // ---------------------------------------------------------------------------

@@ -63,6 +63,20 @@
   </div>
   <div class="card-body p-3" id="locPanelContent"></div>
 </div>
+
+<!-- Fullscreen Image Viewer -->
+<div class="modal fade" id="imageViewer" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-fullscreen">
+    <div class="modal-content bg-dark">
+      <div class="modal-header border-0">
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body d-flex align-items-center justify-content-center p-0">
+        <img id="fullImage" src="" class="img-fluid" style="max-height:90vh; object-fit:contain" alt="full size" />
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
