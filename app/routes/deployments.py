@@ -10,7 +10,11 @@ from app.models.database import db
 from app.models.trap import Trap
 from app.models.deployment import Deployment
 from app.models.deployment_location import DeploymentLocation
+from app.models import deployment_location
+from app.models.picture import Picture
 from app.services import deployment_service
+from app.time_utils import format_app_datetime
+from app.models.notes import Notes
 
 deployments_bp = Blueprint("deployments", __name__, url_prefix="/api")
 
@@ -78,9 +82,7 @@ def create_deployment_manual():
     try:
         dep = deployment_service.create_deployment(
             trap,
-            location=data.get("location"),
-            notes=data.get("notes"),
-        )
+            location=data.get("location"))
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -103,8 +105,11 @@ def update_deployment(dep_id):
 
     if "animal_capture" in data:
         dep.animal_capture = data["animal_capture"]
-    if "notes" in data:
-        dep.notes = data["notes"]
+
+    if "notes" in data and data["notes"] is not None:
+        note_text = str(data["notes"])
+        new_note = Notes(deployment_id=dep.id, notes=note_text)
+        db.session.add(new_note)
 
     try:
         db.session.commit()
@@ -114,6 +119,7 @@ def update_deployment(dep_id):
         return _error("Internal Server Error", 500)
 
     return jsonify(dep.to_dict()), 200
+
 
 
 @deployments_bp.route("/deployments/<int:dep_id>", methods=["DELETE"])
@@ -163,8 +169,18 @@ def upload_photo(dep_id):
     file_path = os.path.join(UPLOAD_DIR, stored_name)
     file.save(file_path)
 
-    dep.photo_filename = file.filename
-    dep.photo_url = f"/static/uploads/{stored_name}"
+
+    """Create new Pic record on the picture table linked to this deployment"""
+    photo_url = f"/static/uploads/{stored_name}"
+    photo_filename = file.filename
+    
+    new_photo = Picture(
+        deployment_id=dep.id,
+        photo_url=photo_url,
+        photo_filename=photo_filename              
+    )
+    
+    db.session.add(new_photo)
 
     try:
         db.session.commit()
@@ -242,7 +258,6 @@ def deployment_latest_location(dep_id):
         return _error("No location recorded", 404)
 
     return jsonify(loc.to_dict()), 200
-
 
 @deployments_bp.route("/traps/<int:trap_id>/locations", methods=["GET"])
 @require_api_key

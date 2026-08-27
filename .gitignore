@@ -16,3 +16,5 @@ data/
 .idea/
 instance/
 .DS_Store
+/app/static/uploads/
+

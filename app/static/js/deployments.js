@@ -84,21 +84,41 @@ function render() {
 }
 
 function rowHtml(d) {
+
+  const photosHtml = Array.isArray(d.pictures) && d.pictures.length > 0
+    ? `<div class="d-flex flex-wrap gap-1 mt-2">
+        ${d.pictures.map(p => `
+          <img src="${p.photo_url}" 
+               class="img-thumbnail" 
+               style="max-height:80px; width:auto; cursor:pointer; object-fit:cover;" 
+               alt="photo"
+               onclick="event.stopPropagation(); openImageViewer('${p.photo_url}')" />
+        `).join("")}
+       </div>`
+    : (d.photo_url // Fallback for legacy single-photo field
+      ? `<img src="${d.photo_url}" class="img-thumbnail mt-2" style="max-height:120px; cursor:pointer" alt="photo"
+                onclick="event.stopPropagation(); openImageViewer('${d.photo_url}')" />`
+      : "");
+
+  const notesHtml = Array.isArray(d.notes) && d.notes.length > 0
+    ? `<div class="small text-muted">
+        ${d.notes.map(n => `<div>• ${escapeHtml(n.notes)} </div>`).join("")}
+       </div>`
+    : (typeof d.notes === "string" && d.notes ? escapeHtml(d.notes) : "—");
+
   return `
     <tr>
       <td>${d.id}</td>
       <td><a href="/traps">${escapeHtml(String(d.trap_id))}</a></td>
       <td>${d.status === "active"
-        ? '<span class="badge text-bg-success">active</span>'
-        : '<span class="badge text-bg-secondary">closed</span>'}
+      ? '<span class="badge text-bg-success">active</span>'
+      : '<span class="badge text-bg-secondary">closed</span>'}
       </td>
       <td class="timestamp">${fmtTs(d.start_date)}</td>
       <td class="timestamp">${fmtTs(d.end_date)}</td>
       <td>${escapeHtml(d.animal_capture) || "—"}</td>
-      <td>${d.photo_url
-        ? `<img src="${d.photo_url}" alt="photo" style="height:40px" class="img-thumbnail" />`
-        : "—"}
-      </td>
+      <td>${notesHtml}</td>
+      <td>${photosHtml}</td>
       <td class="text-end actions-cell">
         <button class="btn btn-sm btn-outline-primary" onclick="showLocations(${d.id})" title="Locations">
           <i class="bi bi-geo-alt"></i>
@@ -108,6 +128,7 @@ function rowHtml(d) {
         </button>
       </td>
     </tr>`;
+
 }
 
 // ---------------------------------------------------------------------------

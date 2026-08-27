@@ -8,6 +8,8 @@ import logging
 from app.models.database import db
 from app.models.deployment import Deployment
 from app.models.deployment_location import DeploymentLocation
+from app.models.notes import Notes
+
 
 logger = logging.getLogger("app.deployment_service")
 
@@ -24,10 +26,17 @@ def create_deployment(trap, location=None, notes=None):
     deployment = Deployment(
         trap_id=trap.id,
         status="active",
-        notes=notes,
     )
     db.session.add(deployment)
     db.session.flush()  # obtain the auto-generated deployment.id
+
+    if notes is not None:
+        db.session.add(
+            Notes(
+                deployment_id=deployment.id,
+                notes=str(notes),
+            )
+        )
 
     if location is not None:
         db.session.add(
@@ -36,6 +45,7 @@ def create_deployment(trap, location=None, notes=None):
                 location=location,
             )
         )
+
 
     logger.info(
         "Created deployment #%d for trap #%d (%s)",

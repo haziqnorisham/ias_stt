@@ -1,7 +1,11 @@
 """Application configuration loaded from environment variables."""
 import os
 import uuid
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+try:
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+except ImportError:
+    from backports.zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 
 from dotenv import load_dotenv
 

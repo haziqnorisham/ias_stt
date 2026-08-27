@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="dark">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,7 +13,7 @@
         document.documentElement.setAttribute(
           "data-bs-theme", t === "light" ? "light" : "dark"
         );
-      } catch (e) {}
+      } catch (e) { }
     })();
   </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" />
@@ -21,6 +22,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   {% block extra_css %}{% endblock %}
 </head>
+
 <body>
   <div id="wrapper">
     <!-- Sidebar -->
@@ -45,6 +47,7 @@
         <li class="nav-item {% if active_page == 'deployments' %}active{% endif %}">
           <a class="nav-link" href="/deployments"><i class="bi bi-clock-history"></i><span>Deployments</span></a>
         </li>
+
       </ul>
 
       <hr class="sidebar-divider" />
@@ -75,17 +78,22 @@
           </button>
           <ul class="navbar-nav ms-auto">
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
-                 data-bs-toggle="dropdown" aria-expanded="false">
+              <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown"
+                aria-expanded="false">
                 <span class="d-none d-md-inline text-gray-600">Operator</span>
-                <img class="img-profile rounded-circle"
-                     src="{{ url_for('static', filename='images/ias-1.png') }}" alt="user" />
+                <img class="img-profile rounded-circle" src="{{ url_for('static', filename='images/ias-1.png') }}"
+                  alt="user" />
               </a>
               <ul class="dropdown-menu dropdown-menu-end shadow animated--grow-in" aria-labelledby="userDropdown">
-                <li><h6 class="dropdown-header">Account</h6></li>
+                <li>
+                  <h6 class="dropdown-header">Account</h6>
+                </li>
                 <li><a class="dropdown-item" href="/traps"><i class="bi bi-speedometer2"></i> Traps</a></li>
-                <li><hr class="dropdown-divider" /></li>
-                <li><button type="button" class="dropdown-item" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Logout</button></li>
+                <li>
+                  <hr class="dropdown-divider" />
+                </li>
+                <li><button type="button" class="dropdown-item" id="logoutBtn"><i class="bi bi-box-arrow-right"></i>
+                    Logout</button></li>
               </ul>
             </li>
           </ul>
@@ -100,7 +108,8 @@
             <nav aria-label="breadcrumb">
               <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="/traps">Home</a></li>
-                <li class="breadcrumb-item active" aria-current="page">{% block breadcrumb_active %}Traps{% endblock %}</li>
+                <li class="breadcrumb-item active" aria-current="page">{% block breadcrumb_active %}Traps{% endblock %}
+                </li>
               </ol>
             </nav>
           </div>
@@ -124,10 +133,11 @@
   {% block modals %}{% endblock %}
 
   <script>
-    window.APP_TIMEZONE = {{ config["APP_TIMEZONE"]|tojson }};
+    window.APP_TIMEZONE = {{ config["APP_TIMEZONE"] | tojson }};
   </script>
   <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
   <script src="{{ url_for('static', filename='js/layout.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>
+
 </html>

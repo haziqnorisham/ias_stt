@@ -6,7 +6,11 @@ timezone for API serialization, logs, and frontend display.
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+try:
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+except ImportError:
+    from backports.zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 
 from flask import current_app, has_app_context
 

@@ -114,8 +114,8 @@ function trapSection({ trap, deployments }) {
       <div id="${id}" class="collapse${state.traps.length === 1 ? " show" : ""}">
         <div class="card-body p-2">
           ${deployments.length === 0
-            ? '<p class="text-muted small text-center mb-2">No deployments yet.</p>'
-            : deployments.map(d => deploymentCard(d, trap)).join("<hr class='my-2' />")}
+      ? '<p class="text-muted small text-center mb-2">No deployments yet.</p>'
+      : deployments.map(d => deploymentCard(d, trap)).join("<hr class='my-2' />")}
           <hr class="my-2" />
           <div class="d-flex align-items-center justify-content-between px-2 gap-2">
             <button class="btn btn-sm btn-outline-success btn-action flex-shrink-0"
@@ -138,6 +138,30 @@ function deploymentCard(d, trap) {
   const badge = d.status === "active"
     ? '<span class="badge text-bg-success">active</span>'
     : '<span class="badge text-bg-secondary">closed</span>';
+
+  const notesHtml = Array.isArray(d.notes) && d.notes.length > 0
+    ? `<div class="mt-1 text-muted small">
+        ${d.notes.map(n => `<div>• ${escapeHtml(n.notes || n.note)} </div>`).join("")}
+       </div>`
+    : (typeof d.notes === "string" && d.notes ? `<br><small class="text-muted">${escapeHtml(d.notes)}</small>` : "");
+
+
+  // 2. Render gallery of photos (if any exist)
+  const photosHtml = Array.isArray(d.pictures) && d.pictures.length > 0
+    ? `<div class="d-flex flex-wrap gap-1 mt-2">
+        ${d.pictures.map(p => `
+          <img src="${p.photo_url}" 
+               class="img-thumbnail" 
+               style="max-height:80px; width:auto; cursor:pointer; object-fit:cover;" 
+               alt="photo"
+               onclick="event.stopPropagation(); openImageViewer('${p.photo_url}')" />
+        `).join("")}
+       </div>`
+    : (d.photo_url // Fallback for legacy single-photo field
+      ? `<img src="${d.photo_url}" class="img-thumbnail mt-2" style="max-height:120px; cursor:pointer" alt="photo"
+                onclick="event.stopPropagation(); openImageViewer('${d.photo_url}')" />`
+      : "");
+
   return `
     <div class="px-2">
       <div class="d-flex justify-content-between align-items-center mb-1">
@@ -145,22 +169,21 @@ function deploymentCard(d, trap) {
         <small class="text-muted">${fmtTs(d.start_date)}</small>
       </div>
       ${d.end_date ? `<small class="text-muted d-block">Ended: ${fmtTs(d.end_date)}</small>` : ""}
+      
       <div class="d-flex align-items-center gap-2 mt-2">
         <span class="small flex-grow-1">
           Capture: <strong>${escapeHtml(d.animal_capture) || "—"}</strong>
-          ${d.notes ? `<br><small class="text-muted">${escapeHtml(d.notes)}</small>` : ""}
+          ${notesHtml}
         </span>
-        <button class="btn btn-sm btn-outline-info btn-action" onclick="openEdit(${d.id})">
+        <button class="btn btn-sm btn-outline-info btn-action" onclick="openEdit(${d.id})" title="Edit">
           <i class="bi bi-pencil"></i>
         </button>
-        <button class="btn btn-sm btn-outline-success btn-action" onclick="openPhotoUpload(${d.id})">
+        <button class="btn btn-sm btn-outline-success btn-action" onclick="openPhotoUpload(${d.id})" title="Add Photo">
           <i class="bi bi-camera"></i>
         </button>
       </div>
-      ${d.photo_url
-        ? `<img src="${d.photo_url}" class="img-thumbnail mt-2" style="max-height:120px; cursor:pointer" alt="photo"
-               onclick="event.stopPropagation(); openImageViewer('${d.photo_url}')" />`
-        : ""}
+
+      ${photosHtml}
     </div>`;
 }
 
@@ -173,7 +196,9 @@ window.openEdit = function (depId) {
   if (!entry) return;
   document.getElementById("editDepId").value = depId;
   document.getElementById("editAnimalCapture").value = entry.animal_capture || "";
-  document.getElementById("editNotes").value = entry.notes || "";
+  document.getElementById("editAnimalCapture").placeholder = "Enter New Animal Captured";
+  document.getElementById("editNotes").value = "";
+  document.getElementById("editNotes").placeholder = "Enter New Notes";
   editModal.show();
 };
 
