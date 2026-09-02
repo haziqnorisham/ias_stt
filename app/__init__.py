@@ -4,6 +4,7 @@ import os
 from logging.handlers import RotatingFileHandler
 
 from flask import Flask, jsonify
+from flask_cors import CORS
 
 from app.config import Config
 from app.time_utils import AppTimezoneFormatter
@@ -51,6 +52,13 @@ def create_app(config_class: type = Config) -> Flask:
     """Application factory."""
     app = Flask(__name__)
     app.config.from_object(config_class)
+    CORS(
+        app,
+        origins="*",
+        send_wildcard=True,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    )
 
     _configure_logging(app)
     _register_error_handlers(app)

@@ -25,6 +25,8 @@ web UI for managing traps.
 - **API key authentication** — `/api/*` endpoints require an `Authorization:
   Bearer <API_KEY>` header; the web UI has a `/login` page (key stored in
   `sessionStorage`). Toggle by setting/clearing `API_KEY`.
+- **Cross-origin API access** — CORS is enabled for all origins and supports
+  JSON requests authenticated with the `Authorization` header.
 
 ## Project structure
 
@@ -430,8 +432,8 @@ hardcoded anywhere in the source.
 
 - Rate limiting on `/api/*`, especially `/api/auth/verify`, to deter API-key
   brute forcing (e.g. `flask-limiter`).
-- Security headers (e.g. `flask-talisman` or at the proxy) and scoped CORS only
-  if a cross-origin client (e.g. Grafana) needs API access.
+- Security headers (e.g. `flask-talisman` or at the proxy). CORS is intentionally
+  enabled for all origins; keep `API_KEY` configured outside local development.
 - Run a dependency vulnerability scan before each release: `pip-audit`.
 
 ## Docker deployment
