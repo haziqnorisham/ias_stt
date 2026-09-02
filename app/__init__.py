@@ -75,6 +75,8 @@ def create_app(config_class: type = Config) -> Flask:
         from app.models.tracker_uplink import TrackerUplink  # noqa: F401
         from app.models.trap import Trap  # noqa: F401  (register model)
         from app.models.server_configuration import server_configuration  # noqa: F401  (register model)
+        from app.models.picture import Picture    # noqa: F401  (register model)
+        from app.models.notes import Notes    # noqa: F401  (register model)
 
         db.create_all()
 
@@ -84,6 +86,8 @@ def create_app(config_class: type = Config) -> Flask:
     from app.routes.trackers import trackers_bp
     from app.routes.uplinks import uplinks_bp
     from app.routes.server_configuration import server_configuration_bp
+    from app.routes.picture import picture_bp
+    from app.routes.notes import note_bp
 
     app.register_blueprint(api_bp)
     app.register_blueprint(traps_bp)
@@ -91,6 +95,8 @@ def create_app(config_class: type = Config) -> Flask:
     app.register_blueprint(trackers_bp)
     app.register_blueprint(uplinks_bp)
     app.register_blueprint(server_configuration_bp)
+    app.register_blueprint(picture_bp)
+    app.register_blueprint(note_bp)
 
     if app.config["ENABLE_FRONTEND"]:
         from app.routes.frontend import frontend_bp

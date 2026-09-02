@@ -36,3 +36,4 @@ def trackers_page():
 @frontend_bp.route("/uplinks", methods=["GET"])
 def uplinks_page():
     return render_template("uplinks.html")
+
