@@ -25,9 +25,9 @@
                 </h1>
                 <div class="alert alert-danger d-none" id="loginError" role="alert"></div>
                 <hr class="mt-4" />
-                <label for="trackerList">Choose a Tracker:</label>
-                <select id="trackerList" name="trackerList">
-                    <option value="">--Please choose an option--</option>
+                <label for="trackerList" class="form-label">Choose a Tracker:</label>
+                <select class="form-select mb-3" id="trackerList" name="trackerList">
+                    <option value="">--No Tracker--</option>
                 </select>
 
                 <div id="toast-container">
@@ -42,8 +42,6 @@
     <!-- Script tag containing your scanner code to allow scanning another one -->
     <script src="{{ url_for('static', filename='js/qr_scanner.js') }}"></script>
     <script src="{{ url_for('static', filename='js/tracker_assignment.js') }}"></script>
-
-
 
 
 </div>

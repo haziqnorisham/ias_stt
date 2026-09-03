@@ -44,7 +44,7 @@ async function populateDropdown() {
             stt => !assignedTrackerIds.has(stt.device_eui)
         );
 
-        dropdown.innerHTML = '<option value="">--Please choose an option--</option>';
+        dropdown.innerHTML = '<option value="">--No Tracker--</option>';
 
         if (availableTrackers.length === 0) {
             const option = document.createElement("option");
