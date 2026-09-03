@@ -1,7 +1,7 @@
 """CRUD API for trap device configurations (/api/traps)."""
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, render_template
 from sqlalchemy.exc import IntegrityError
 
 from app.auth import require_api_key
@@ -99,13 +99,47 @@ def list_traps():
     return jsonify([t.to_dict() for t in traps]), 200
 
 
-@traps_bp.route("/<int:trap_pk>", methods=["GET"])
+@traps_bp.route("/<string:trap_id>", methods=["PUT"])
 @require_api_key
-def get_trap(trap_pk):
-    trap = db.session.get(Trap, trap_pk)
+def update_trap_by_id(trap_id):
+    trap = db.session.scalars(db.select(Trap).where(Trap.trap_id == '{trap_id}'))
     if trap is None:
         return _error("Trap not found", 404)
-    return jsonify(trap.to_dict()), 200
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error("Request body must be a JSON object", 400)
+    
+    tracker_update = []
+
+    try:
+        if "trap_id" in data and "tracker_id" in data:
+            trap_id = data["trap_id"]
+            tracker_id = str(data.get("tracker_id"))
+
+            existing_row = Trap.query.filter_by(trap_id=trap_id).first()
+            if not existing_row:
+                return jsonify({"error": f"No trap found with trap_id {trap_id}"}), 404
+
+            existing_row.tracker_id = tracker_id
+
+            tracker_update.append({
+                "id": existing_row.id,
+                "trap_id": existing_row.trap_id,
+                "tracker_id": existing_row.tracker_id,
+            })
+            db.session.add(existing_row)
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Failed to save trap")
+        return _error("Internal Server Error"), 500
+
+    return jsonify(
+        {
+            "message": "Trap data received",
+            "tracker_update": tracker_update,
+        }
+    ), 201
 
 
 @traps_bp.route("", methods=["POST"])

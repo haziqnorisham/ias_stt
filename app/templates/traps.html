@@ -17,15 +17,10 @@
 <!-- Traps card -->
 <div class="card border-left-primary">
   <div class="card-header py-3 d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between">
-    <h6 class="m-0 font-weight-bold"><i class="bi bi-bug-fill me-1"></i>Trap registry</h6>
+    <h6 class="m-0 font-weight-bold"><i class="bi bi-bug-fill me-1"></i>Traps Registry</h6>
     <div class="d-flex flex-wrap gap-2">
-      <input
-        type="text"
-        class="form-control form-control-sm"
-        id="searchInput"
-        placeholder="Search by Trap ID or Location..."
-        style="min-width: 240px"
-      />
+      <input type="text" class="form-control form-control-sm" id="searchInput"
+        placeholder="Search by Trap ID or Location..." style="min-width: 240px" />
       <select class="form-select form-select-sm w-auto" id="statusFilter">
         <option value="">All statuses</option>
         <option value="active">active</option>
@@ -61,7 +56,9 @@
           </tr>
         </thead>
         <tbody id="trapsBody">
-          <tr><td colspan="11" class="text-center text-muted py-4">Loading…</td></tr>
+          <tr>
+            <td colspan="11" class="text-center text-muted py-4">Loading…</td>
+          </tr>
         </tbody>
       </table>
     </div>
