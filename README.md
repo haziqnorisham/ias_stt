@@ -211,6 +211,33 @@ received uplink.
 The SB Admin 2-style `/uplinks` page provides tracker/source filters,
 pagination, refresh, and an uplink detail modal.
 
+## Unassigned trackers API (`/api/stt/unassigned`)
+
+`GET /api/stt/unassigned` returns registered smart trap trackers that are not
+referenced by any row in the `traps` table. A tracker is matched by comparing
+its `device_eui` with `traps.tracker_id`.
+
+Both active and inactive traps count as assignments. Empty `tracker_id` values
+do not count as assignments. Matching is exact and case-sensitive.
+
+The endpoint returns the standard tracker objects and supports the same
+pagination parameters as the regular tracker list:
+
+| Parameter | Default | Description |
+| --- | ---: | --- |
+| `limit` | `100` | Maximum number of trackers to return. |
+| `offset` | `0` | Number of trackers to skip. |
+
+Example:
+
+```bash
+curl 'http://localhost:8080/api/stt/unassigned?limit=100&offset=0'
+```
+
+When `API_KEY` is configured, include an `Authorization: Bearer <API_KEY>`
+header. The endpoint returns `200` with an empty array when every registered
+tracker is assigned or no trackers exist.
+
 ## Trap configuration API (`/api/traps`)
 
 Trap device configurations are stored in a file-based **SQLite** database

@@ -25,6 +25,8 @@ tags:
     description: Decoded GPS tracker payload ingest (ChirpStack HTTP integration)
   - name: Uplinks
     description: Historical uplinks received from registered tracker devices
+  - name: Trackers
+    description: Registered smart trap trackers
   - name: Traps
     description: Trap device CRUD
   - name: Deployments
@@ -189,6 +191,33 @@ paths:
           $ref: '#/components/responses/401'
         404:
           $ref: '#/components/responses/404'
+
+  # -- Trackers ---------------------------------------------------------------
+  /api/stt/unassigned:
+    get:
+      tags: [Trackers]
+      summary: List trackers that are not assigned to a trap
+      description: |
+        Returns registered trackers whose `device_eui` does not match a
+        non-empty `tracker_id` on any trap. Both active and inactive traps
+        count as assignments. Matching is exact and case-sensitive.
+      operationId: listUnassignedTrackers
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+      responses:
+        200:
+          description: A JSON array of unassigned trackers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SmartTrapTracker'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
 
   # -- Traps -----------------------------------------------------------------
   /api/traps:
@@ -670,6 +699,20 @@ components:
             position:    { type: string, description: Mapped to tracker tilt_status. }
             battery:     { type: integer }
       required: [deviceInfo]
+
+    SmartTrapTracker:
+      type: object
+      properties:
+        id:            { type: integer, readOnly: true }
+        display_name:  { type: string, maxLength: 255, nullable: true }
+        device_eui:    { type: string, maxLength: 100 }
+        latitude:      { type: number, format: float, nullable: true }
+        longitude:     { type: number, format: float, nullable: true }
+        tilt_status:   { type: string, maxLength: 50, nullable: true }
+        battery:       { type: integer, nullable: true }
+        created_date:  { type: string, format: date-time, nullable: true }
+        updated_date:  { type: string, format: date-time, nullable: true }
+      required: [id, device_eui]
 
     TrackerUplink:
       type: object
