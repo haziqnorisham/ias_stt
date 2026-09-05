@@ -2,11 +2,13 @@
 from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, current_app, jsonify, request
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.auth import require_api_key
 from app.models.database import db
 from app.models.smart_trap_tracker import SmartTrapTracker
+from app.models.trap import Trap
 
 trackers_bp = Blueprint("trackers", __name__, url_prefix="/api/stt")
 
@@ -28,6 +30,19 @@ EDITABLE_FIELDS = (
 
 def _error(message, code):
     return jsonify({"error": message}), code
+
+
+def _get_pagination():
+    try:
+        limit = int(request.args.get("limit", 100))
+        offset = int(request.args.get("offset", 0))
+    except (TypeError, ValueError):
+        return None, None, _error("'limit' and 'offset' must be integers", 400)
+    if limit < 0 or offset < 0:
+        return None, None, _error(
+            "'limit' and 'offset' must be non-negative", 400
+        )
+    return limit, offset, None
 
 
 def _validate_string(field, value):
@@ -91,13 +106,9 @@ def _apply_fields(tracker, data):
 @trackers_bp.route("", methods=["GET"])
 @require_api_key
 def list_trackers():
-    try:
-        limit = int(request.args.get("limit", 100))
-        offset = int(request.args.get("offset", 0))
-    except (TypeError, ValueError):
-        return _error("'limit' and 'offset' must be integers", 400)
-    if limit < 0 or offset < 0:
-        return _error("'limit' and 'offset' must be non-negative", 400)
+    limit, offset, error = _get_pagination()
+    if error:
+        return error
 
     query = SmartTrapTracker.query
     device_eui = request.args.get("device_eui")
@@ -108,6 +119,29 @@ def list_trackers():
         query.order_by(SmartTrapTracker.id).limit(limit).offset(offset).all()
     )
     return jsonify([t.to_dict() for t in trackers]), 200
+
+
+@trackers_bp.route("/unassigned", methods=["GET"])
+@require_api_key
+def list_unassigned_trackers():
+    limit, offset, error = _get_pagination()
+    if error:
+        return error
+
+    assignment_exists = select(Trap.id).where(
+        Trap.tracker_id.is_not(None),
+        Trap.tracker_id != "",
+        Trap.tracker_id == SmartTrapTracker.device_eui,
+    ).exists()
+    stmt = (
+        select(SmartTrapTracker)
+        .where(~assignment_exists)
+        .order_by(SmartTrapTracker.id)
+        .limit(limit)
+        .offset(offset)
+    )
+    trackers = db.session.execute(stmt).scalars().all()
+    return jsonify([tracker.to_dict() for tracker in trackers]), 200
 
 
 @trackers_bp.route("/<int:tracker_pk>", methods=["GET"])
