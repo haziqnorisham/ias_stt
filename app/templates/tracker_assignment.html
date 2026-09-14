@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% set active_page = "traps" %}
+
+{% block title %}Traps — Trap Management{% endblock %}
+
+{% block page_title %}Trap Management{% endblock %}
+{% block page_heading %}Traps{% endblock %}
+{% block breadcrumb_active %}Traps{% endblock %}
+
+{% block content %}
+<h1>Trap Tracker Assignment</h1>
+
+<div class="card border-left-primary">
+    <div class="card-header py-3 d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between">
+        <h2>Trap ID: <span id="trapId" current_trap_id="{{ id }}" style="color: red;">{{ id }}</span></h2>
+    </div>
+
+
+    <div class="trap-assignment-page">
+        <div class="card trap-assignment-card">
+            <div class="card-body p-5">
+                <img alt="Trap Image" class="trap-assignment-logo" />
+                <h1 class="trap-assignment-title mb-1">
+                    <i class="bi bi-shield-lock me-2"></i>Tracker Assignment
+                </h1>
+                <div class="alert alert-danger d-none" id="loginError" role="alert"></div>
+                <hr class="mt-4" />
+                <label for="trackerList" class="form-label">Choose a Tracker:</label>
+                <select class="form-select mb-3" id="trackerList" name="trackerList">
+                    <option value="">--No Tracker--</option>
+                </select>
+
+                <div id="toast-container">
+                    <button onclick="toast(assignTracker())" class="btn btn-primary w-100" id="assignBtn">Assign
+                        to
+                        Trap</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script tag containing your scanner code to allow scanning another one -->
+    <script src="{{ url_for('static', filename='js/qr_scanner.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tracker_assignment.js') }}"></script>
+
+
+</div>
+{% endblock %}

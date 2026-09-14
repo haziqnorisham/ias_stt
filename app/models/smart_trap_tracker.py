@@ -19,6 +19,9 @@ class SmartTrapTracker(db.Model):
     longitude = db.Column(db.Numeric(8, 5))
     tilt_status = db.Column(db.String(50))
     battery = db.Column(db.Integer)
+    tamper_status = db.Column(db.String(50), nullable=True)
+    rssi = db.Column(db.Integer, nullable=True)
+    snr = db.Column(db.Numeric(5, 2), nullable=True)
     created_date = db.Column(db.DateTime(timezone=True), default=_utcnow)
     updated_date = db.Column(
         db.DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
@@ -33,6 +36,10 @@ class SmartTrapTracker(db.Model):
             "longitude": float(self.longitude) if self.longitude is not None else None,
             "tilt_status": self.tilt_status,
             "battery": self.battery,
+            "tamper_status": self.tamper_status,
+            "rssi": self.rssi,
+            "snr": float(self.snr) if self.snr is not None else None,
+            "signal_quality": self.signal_quality,
             "created_date": format_app_datetime(self.created_date),
             "updated_date": format_app_datetime(self.updated_date),
         }
@@ -74,3 +81,15 @@ class SmartTrapTracker(db.Model):
         with get_engine().connect() as conn:
             conn.execute(stmt)
             conn.commit()
+
+    @property
+    def signal_quality(self):
+      if self.rssi is None or self.snr is None:
+        return "Unknown"
+      if self.rssi >= -90 and float(self.snr) >= 5:
+        return "Excellent"
+      elif self.rssi >= -105 and float(self.snr) >= 0:
+        return "Good"
+      elif self.rssi >= -115 and float(self.snr) >= -7:
+        return "Fair"
+      return "Weak"

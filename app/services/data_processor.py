@@ -16,6 +16,7 @@ FIELD_MAP = {
     "longitude": "longitude",
     "position": "tilt_status",
     "battery": "battery",
+    "tamper_status": "tamper_status",
 }
 
 
@@ -223,26 +224,50 @@ def _notify_trap_closed(dev_eui):
 
 def _parse_sensor_updates(data):
     """Return validated tracker-column values from a decoded payload."""
-    obj = data.get("object", {})
-    if not isinstance(obj, dict) or not obj:
-        return {}
-
     updates = {}
-    for payload_key, column in FIELD_MAP.items():
-        if payload_key not in obj:
-            continue
-        value = obj[payload_key]
-        if column == "battery":
-            try:
-                value = int(value)
-            except (ValueError, TypeError):
+    obj = data.get("object", {})
+    if isinstance(obj, dict) and obj:
+        for payload_key, column in FIELD_MAP.items():
+            if payload_key not in obj:
                 continue
-        elif column in ("latitude", "longitude"):
+        elif column == "tamper_status":
             try:
-                value = float(value)
+                value = string(value)
             except (ValueError, TypeError):
                 continue
         updates[column] = value
+            value = obj[payload_key]
+            if column == "battery":
+                try:
+                    value = int(value)
+                except (ValueError, TypeError):
+                    continue
+            elif column in ("latitude", "longitude"):
+                try:
+                    value = float(value)
+                except (ValueError, TypeError):
+                    continue
+            elif column == "sensor_reading": 
+                try:
+                    value = float(value)  # or int(value), str(value), etc.
+                except (ValueError, TypeError):
+                    continue
+            updates[column] = value
+
+    rx_info = data.get("rxInfo", [])
+    if isinstance(rx_info, list) and len(rx_info) > 0:
+        first_rx = rx_info[0]
+        if isinstance(first_rx, dict):
+            if "rssi" in first_rx:
+                try:
+                    updates["rssi"] = int(first_rx["rssi"])
+                except (ValueError, TypeError):
+                    pass
+            if "snr" in first_rx:
+                try:
+                    updates["snr"] = float(first_rx["snr"])
+                except (ValueError, TypeError):
+                    pass
     return updates
 
 
@@ -257,7 +282,10 @@ def _store_uplink(data, dev_eui, topic, payload, source):
         latitude=updates.get("latitude"),
         longitude=updates.get("longitude"),
         tilt_status=updates.get("tilt_status"),
+        tamper_status=updates.get("tamper_status"),
         battery=updates.get("battery"),
+        rssi=updates.get("rssi"),
+        snr=updates.get("snr"),
         raw_payload=raw_payload,
     )
     db.session.add(uplink)

@@ -37,3 +37,6 @@ def trackers_page():
 def uplinks_page():
     return render_template("uplinks.html")
 
+@frontend_bp.route("/qr_scanner", methods=["GET"])
+def qr_scanner_page():
+    return render_template("qr_scanner.html")

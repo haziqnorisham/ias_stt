@@ -16,6 +16,7 @@ STRING_FIELDS = {
     "display_name": 255,
     "device_eui": 100,
     "tilt_status": 50,
+    "tamper_status": 50,
 }
 REQUIRED_CREATE = ("device_eui", "display_name")
 EDITABLE_FIELDS = (
@@ -25,6 +26,7 @@ EDITABLE_FIELDS = (
     "longitude",
     "tilt_status",
     "battery",
+    "tamper_status",
 )
 
 
