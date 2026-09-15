@@ -30,6 +30,8 @@ ROLE_PERMISSIONS = {
         "deployment_photos:create",
         "uplinks:read",
         "settings:admin",
+        "notifications:read",
+        "notifications:state:update",
     },
     "field_operator": {
         "traps:read",
@@ -38,6 +40,8 @@ ROLE_PERMISSIONS = {
         "traps:update",
         "deployments:update",
         "deployment_photos:create",
+        "notifications:read",
+        "notifications:state:update",
     },
     "read_only": {
         "traps:read",
@@ -46,6 +50,8 @@ ROLE_PERMISSIONS = {
         "trackers:unassigned:read",
         "deployments:read",
         "uplinks:read",
+        "notifications:read",
+        "notifications:state:update",
     },
 }
 

@@ -26,6 +26,12 @@ class User(db.Model):
         db.DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
     )
 
+    notification_states = db.relationship(
+        "NotificationUserState",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
     def set_password(self, password):
         # Explicit PBKDF2 avoids relying on optional OpenSSL scrypt support.
         self.password_hash = generate_password_hash(

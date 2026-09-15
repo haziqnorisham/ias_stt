@@ -35,6 +35,8 @@ tags:
     description: Trap device CRUD
   - name: Deployments
     description: Deployment tracking and location history
+  - name: Notifications
+    description: Per-user in-app notification events and state
 
 # ===========================================================================
 # Paths
@@ -392,6 +394,178 @@ paths:
                 $ref: '#/components/schemas/TrackerUplinkDetail'
         401:
           $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+  # -- Notifications ----------------------------------------------------------
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications for the current user
+      description: |
+        Returns non-expired notifications joined with the current user's
+        read and dismissal state. The default `active` status excludes
+        notifications dismissed by the current user.
+      operationId: listNotifications
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, unread, read, dismissed, all]
+            default: active
+          description: Filter by the current user's notification state
+        - $ref: '#/components/parameters/notification_limit'
+        - $ref: '#/components/parameters/offset'
+        - name: event_type
+          in: query
+          schema: { type: string, maxLength: 100 }
+          description: Filter by event type
+        - name: severity
+          in: query
+          schema: { type: string, maxLength: 20 }
+          description: Filter by severity
+        - name: entity_type
+          in: query
+          schema: { type: string, maxLength: 50 }
+          description: Filter by related entity type
+      responses:
+        200:
+          description: Notifications and current-user state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListResponse'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+        422:
+          $ref: '#/components/responses/422'
+
+  /api/notifications/test:
+    post:
+      tags: [Notifications]
+      summary: Create an administrator test notification
+      description: |
+        Creates a normal in-app notification event for frontend and delivery
+        testing. This endpoint requires the administrator `settings:admin`
+        permission. The notification is visible to users through the normal
+        notification list endpoint and is not sent through external channels.
+      operationId: createTestNotification
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestNotificationRequest'
+            example:
+              title: Test notification
+              message: This is a test notification.
+              severity: info
+      responses:
+        201:
+          description: Test notification created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+        422:
+          $ref: '#/components/responses/422'
+        500:
+          $ref: '#/components/responses/500'
+
+  /api/notifications/summary:
+    get:
+      tags: [Notifications]
+      summary: Get notification counts for the current user
+      operationId: notificationSummary
+      responses:
+        200:
+          description: Active and unread notification counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSummary'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+
+  /api/notifications/{notification_id}:
+    parameters:
+      - name: notification_id
+        in: path
+        required: true
+        schema: { type: integer }
+        description: Notification primary key ID
+    get:
+      tags: [Notifications]
+      summary: Get one notification for the current user
+      operationId: getNotification
+      responses:
+        200:
+          description: Notification and current-user state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+        404:
+          $ref: '#/components/responses/404'
+
+  /api/notifications/{notification_id}/read:
+    parameters:
+      - name: notification_id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Notifications]
+      summary: Mark a notification as read for the current user
+      operationId: markNotificationRead
+      responses:
+        200:
+          description: Updated notification state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+        404:
+          $ref: '#/components/responses/404'
+
+  /api/notifications/{notification_id}/dismiss:
+    parameters:
+      - name: notification_id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Notifications]
+      summary: Dismiss a notification for the current user
+      operationId: dismissNotification
+      responses:
+        200:
+          description: Updated notification state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
         404:
           $ref: '#/components/responses/404'
 
@@ -887,6 +1061,11 @@ components:
       in: query
       schema: { type: integer, default: 100, minimum: 0 }
       description: Maximum items per page
+    notification_limit:
+      name: limit
+      in: query
+      schema: { type: integer, default: 25, minimum: 0, maximum: 100 }
+      description: Maximum notifications per page
     offset:
       name: offset
       in: query
@@ -1042,6 +1221,56 @@ components:
           properties:
             raw_payload: { type: string }
           required: [raw_payload]
+
+    Notification:
+      type: object
+      properties:
+        id:            { type: integer, readOnly: true }
+        event_type:    { type: string, maxLength: 100 }
+        severity:      { type: string, maxLength: 20 }
+        title:         { type: string, maxLength: 255 }
+        message:       { type: string }
+        entity_type:   { type: string, maxLength: 50, nullable: true }
+        entity_id:     { type: string, maxLength: 100, nullable: true }
+        source_type:   { type: string, maxLength: 50, nullable: true }
+        source_id:     { type: string, maxLength: 100, nullable: true }
+        payload:
+          type: object
+          nullable: true
+          additionalProperties: true
+        dedupe_key:    { type: string, maxLength: 255, nullable: true }
+        created_at:    { type: string, format: date-time, readOnly: true }
+        expires_at:    { type: string, format: date-time, nullable: true }
+        read_at:      { type: string, format: date-time, nullable: true }
+        dismissed_at: { type: string, format: date-time, nullable: true }
+      required: [id, event_type, severity, title, message, created_at]
+
+    TestNotificationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title: { type: string, maxLength: 255 }
+        message: { type: string, maxLength: 2000 }
+        severity: { type: string, enum: [info, warning, critical] }
+
+    NotificationListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Notification' }
+        unread_count: { type: integer, minimum: 0 }
+        total_count: { type: integer, minimum: 0 }
+        limit: { type: integer, minimum: 0 }
+        offset: { type: integer, minimum: 0 }
+      required: [items, unread_count, total_count, limit, offset]
+
+    NotificationSummary:
+      type: object
+      properties:
+        active_count: { type: integer, minimum: 0 }
+        unread_count: { type: integer, minimum: 0 }
+      required: [active_count, unread_count]
 
     Trap:
       type: object
