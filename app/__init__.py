@@ -101,6 +101,9 @@ def create_app(config_class: type = Config) -> Flask:
         )
 
         db.create_all()
+        from app.schema_migrations import upgrade_schema
+
+        upgrade_schema(db.engine)
 
     from app.routes.api import api_bp
     from app.routes.auth import auth_bp

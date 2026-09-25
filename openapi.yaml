@@ -636,6 +636,7 @@ paths:
             example:
               status: active
               trap_id: TRAP-001
+              asset_number: ASSET-001
               tracker_id: TRK-001
               location: north
               temperature: 23.5
@@ -694,6 +695,7 @@ paths:
               $ref: '#/components/schemas/TrapUpdate'
             example:
               status: inactive
+              asset_number: ASSET-001
               location: east
               updated_by: alice
       responses:
@@ -1278,6 +1280,7 @@ components:
         id:                { type: integer, readOnly: true }
         status:            { type: string, enum: [active, inactive] }
         trap_id:           { type: string, maxLength: 50 }
+        asset_number:      { type: string, maxLength: 100, nullable: true }
         tracker_id:        { type: string, maxLength: 50 }
         location:          { type: string, maxLength: 50, nullable: true }
         door_status:       { type: string, maxLength: 20, nullable: true }
@@ -1295,6 +1298,7 @@ components:
       properties:
         status:            { type: string, enum: [active, inactive] }
         trap_id:           { type: string, maxLength: 50 }
+        asset_number:      { type: string, maxLength: 100, nullable: true }
         tracker_id:        { type: string, maxLength: 50, description: Device EUI of an existing tracker; may be omitted/empty. }
         location:          { type: string, maxLength: 50 }
         door_status:       { type: string, maxLength: 20 }
@@ -1308,6 +1312,7 @@ components:
       properties:
         status:            { type: string, enum: [active, inactive] }
         trap_id:           { type: string, maxLength: 50 }
+        asset_number:      { type: string, maxLength: 100, nullable: true }
         tracker_id:        { type: string, maxLength: 50 }
         location:          { type: string, maxLength: 50 }
         door_status:       { type: string, maxLength: 20 }

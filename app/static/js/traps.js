@@ -112,6 +112,7 @@ function visibleRows() {
     rows = rows.filter(
       (r) =>
         (r.trap_id || "").toLowerCase().includes(term) ||
+        (r.asset_number || "").toLowerCase().includes(term) ||
         (r.location || "").toLowerCase().includes(term)
     );
   }
@@ -137,7 +138,7 @@ function render() {
   const tbody = document.getElementById("trapsBody");
   if (rows.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="11" class="text-center text-muted py-4">No traps found.</td></tr>';
+      '<tr><td colspan="12" class="text-center text-muted py-4">No traps found.</td></tr>';
   } else {
     tbody.innerHTML = rows.map(rowHtml).join("");
   }
@@ -166,6 +167,7 @@ function rowHtml(r) {
       <td>${r.id}</td>
       <td>${badge}</td>
       <td>${escapeHtml(r.trap_id)}</td>
+      <td>${escapeHtml(r.asset_number) || "—"}</td>
       <td>${escapeHtml(r.tracker_id)}</td>
       <td>${escapeHtml(r.location) || "—"}</td>
       <td>${escapeHtml(r.door_status) || "—"}</td>
@@ -261,6 +263,7 @@ window.editTrap = function (id) {
   document.getElementById("trapModalTitle").textContent = `Edit Trap #${r.id}`;
   document.getElementById("f_status").value = r.status || "active";
   document.getElementById("f_trap_id").value = r.trap_id || "";
+  document.getElementById("f_asset_number").value = r.asset_number || "";
   document.getElementById("f_location").value = r.location || "";
   document.getElementById("f_door_status").value = r.door_status || "";
   document.getElementById("f_temperature").value = r.temperature ?? "";
@@ -284,6 +287,7 @@ async function submitForm(e) {
   };
 
   const optionals = {
+    asset_number: payload.asset_number,
     location: document.getElementById("f_location").value.trim(),
     door_status: document.getElementById("f_door_status").value,
     notes: document.getElementById("f_notes").value.trim(),

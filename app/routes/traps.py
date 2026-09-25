@@ -14,6 +14,7 @@ traps_bp = Blueprint("traps", __name__, url_prefix="/api/traps")
 STRING_FIELDS = {
     "status": 20,
     "trap_id": 50,
+    "asset_number": 100,
     "tracker_id": 50,
     "location": 50,
     "door_status": 20,
@@ -24,6 +25,7 @@ REQUIRED_CREATE = ("status", "trap_id")
 EDITABLE_FIELDS = (
     "status",
     "trap_id",
+    "asset_number",
     "tracker_id",
     "location",
     "door_status",

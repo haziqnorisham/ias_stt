@@ -23,7 +23,7 @@
         type="text"
         class="form-control form-control-sm"
         id="searchInput"
-        placeholder="Search by Trap ID or Location..."
+        placeholder="Search by Asset Number, Trap ID, or Location..."
         style="min-width: 240px"
       />
       <select class="form-select form-select-sm w-auto" id="statusFilter">
@@ -50,6 +50,7 @@
             <th data-sort="id" class="sortable">ID</th>
             <th data-sort="status" class="sortable">Status</th>
             <th data-sort="trap_id" class="sortable">Trap ID</th>
+            <th data-sort="asset_number" class="sortable">Asset Number</th>
             <th data-sort="tracker_id" class="sortable">Tracker ID</th>
             <th data-sort="location" class="sortable">Location</th>
             <th data-sort="door_status" class="sortable">Door</th>
@@ -61,7 +62,7 @@
           </tr>
         </thead>
         <tbody id="trapsBody">
-          <tr><td colspan="11" class="text-center text-muted py-4">Loading…</td></tr>
+          <tr><td colspan="12" class="text-center text-muted py-4">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -114,6 +115,10 @@
             <div class="col-md-4">
               <label class="form-label">Trap ID <span class="text-danger">*</span></label>
               <input type="text" class="form-control" id="f_trap_id" maxlength="50" required />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Asset Number</label>
+              <input type="text" class="form-control" id="f_asset_number" maxlength="100" />
             </div>
             <div class="col-md-4">
               <label class="form-label">Tracker ID</label>

@@ -255,6 +255,9 @@ Trap device configurations are stored in a file-based **SQLite** database
 (`data/traps.db`, created automatically on startup). Override the location with
 the `DATABASE_URL` environment variable.
 
+The application applies idempotent schema upgrades on startup so existing
+databases receive newly added nullable columns without losing trap records.
+
 > **Auth:** every `/api/traps` request requires a JWT access token. Legacy
 > service integrations may use the configured API key. The examples below omit
 > authentication headers for brevity.
@@ -270,6 +273,7 @@ the `DATABASE_URL` environment variable.
 | `id`          | integer        | primary key, auto-increment       | Read-only; assigned by the database.                   |
 | `status`      | string(20)     | **required**                      | e.g. `active`, `inactive`.                             |
 | `trap_id`     | string(50)     | **required**, **unique**          | Business identifier; duplicates return `409`.          |
+| `asset_number` | string(100)    | optional                          | Asset identifier; nullable and not required to be unique. |
 | `tracker_id`  | string(50)     | optional                          | Linked tracker device EUI (empty allowed; UI offers a dropdown). |
 | `location`    | string(50)     | optional                          |                                                        |
 | `door_status` | string(20)     | optional                          | e.g. `open`, `closed`; typically set by sensors.       |
@@ -310,6 +314,8 @@ Error responses are JSON of the form `{"error": "<message>"}`.
 
 - `status`, `trap_id` are required on create (`400` if missing).
 - `trap_id` must be unique (`409` on duplicate, on both create and update).
+- `asset_number` is optional, nullable, limited to 100 characters, and may be
+  duplicated.
 - `updated_by` is ignored when supplied by a client; the backend records the
   authenticated username or service identity.
 - `temperature` must be numeric (`400` otherwise); string fields must not exceed
@@ -325,6 +331,7 @@ curl -X POST http://localhost:8080/api/traps -H 'Content-Type: application/json'
   -d '{
     "status": "active",
     "trap_id": "TRAP-001",
+    "asset_number": "ASSET-001",
     "tracker_id": "TRK-001",
     "location": "north",
     "temperature": 23.5
@@ -338,6 +345,7 @@ Response `201 Created`:
   "id": 1,
   "status": "active",
   "trap_id": "TRAP-001",
+  "asset_number": "ASSET-001",
   "tracker_id": "TRK-001",
   "location": "north",
   "door_status": null,
@@ -385,7 +393,7 @@ A Jinja2 + Bootstrap single-page interface for managing traps, served at
 - A sortable table of all traps (click any column header to sort).
 - **Add Trap** button and per-row **Edit**/**Delete** actions (delete asks for
   confirmation).
-- Client-side **search** by Trap ID or Location, server-side **status** filter,
+- Client-side **search** by Asset Number, Trap ID, or Location, server-side **status** filter,
   and **pagination** (page-size selector + Prev/Next).
 - Client-side required-field validation and toast notifications that surface
   API errors (e.g. duplicate `trap_id` and invalid field values).

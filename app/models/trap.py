@@ -21,6 +21,7 @@ class Trap(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     status = db.Column(db.String(20), nullable=False)
     trap_id = db.Column(db.String(50), nullable=False, unique=True)
+    asset_number = db.Column(db.String(100))
     tracker_id = db.Column(db.String(50), nullable=False)
     location = db.Column(db.String(50))
     door_status = db.Column(db.String(20))
@@ -74,6 +75,7 @@ class Trap(db.Model):
             "id": self.id,
             "status": self.status,
             "trap_id": self.trap_id,
+            "asset_number": self.asset_number,
             "tracker_id": self.tracker_id,
             "location": location,
             "door_status": door_status,
