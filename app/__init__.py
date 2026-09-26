@@ -87,13 +87,16 @@ def create_app(config_class: type = Config) -> Flask:
         set_engine(db.engine)
 
         from app.models.deployment import Deployment  # noqa: F401
+        from app.models.deployment_action import DeploymentAction  # noqa: F401
+        from app.models.deployment_action_type import (  # noqa: F401
+            DeploymentActionType,
+            seed_default_action_types,
+        )
         from app.models.deployment_location import DeploymentLocation  # noqa: F401
         from app.models.smart_trap_tracker import SmartTrapTracker  # noqa: F401
         from app.models.tracker_uplink import TrackerUplink  # noqa: F401
         from app.models.trap import Trap  # noqa: F401  (register model)
         from app.models.server_configuration import server_configuration  # noqa: F401  (register model)
-        from app.models.picture import Picture    # noqa: F401  (register model)
-        from app.models.notes import Notes    # noqa: F401  (register model)
         from app.models.user import User  # noqa: F401  (register model)
         from app.models.notification import (  # noqa: F401  (register models)
             Notification,
@@ -101,6 +104,7 @@ def create_app(config_class: type = Config) -> Flask:
         )
 
         db.create_all()
+        seed_default_action_types()
         from app.schema_migrations import upgrade_schema
 
         upgrade_schema(db.engine)
@@ -110,11 +114,10 @@ def create_app(config_class: type = Config) -> Flask:
     from app.routes.traps import traps_bp
     from app.routes.users import users_bp
     from app.routes.deployments import deployments_bp
+    from app.routes.deployment_actions import deployment_actions_bp
     from app.routes.trackers import trackers_bp
     from app.routes.uplinks import uplinks_bp
     from app.routes.server_configuration import server_configuration_bp
-    from app.routes.picture import picture_bp
-    from app.routes.notes import note_bp
     from app.routes.notifications import notifications_bp
 
     app.register_blueprint(api_bp)
@@ -122,11 +125,10 @@ def create_app(config_class: type = Config) -> Flask:
     app.register_blueprint(traps_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(deployments_bp)
+    app.register_blueprint(deployment_actions_bp)
     app.register_blueprint(trackers_bp)
     app.register_blueprint(uplinks_bp)
     app.register_blueprint(server_configuration_bp)
-    app.register_blueprint(picture_bp)
-    app.register_blueprint(note_bp)
     app.register_blueprint(notifications_bp)
 
     if app.config["ENABLE_FRONTEND"]:

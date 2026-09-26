@@ -7,6 +7,7 @@ from app import create_app
 from app.config import Config
 from app.models.database import db
 from app.models.deployment import Deployment
+from app.models.deployment_action_type import DeploymentActionType
 from app.models.smart_trap_tracker import SmartTrapTracker
 from app.models.trap import Trap
 from app.models.user import User
@@ -183,28 +184,37 @@ class JwtAuthApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "*")
 
-    def test_uploaded_photo_requires_read_permission_to_retrieve(self):
+    def test_action_picture_requires_read_permission_to_retrieve(self):
         deployment = Deployment(trap_id=self.trap_id, status="active")
+        action_type = DeploymentActionType(
+            code="test_action",
+            label="Test action",
+            is_active=True,
+        )
         db.session.add(deployment)
+        db.session.add(action_type)
         db.session.commit()
         body = self._login("operator", "operator-password")
         headers = self._auth(body["access_token"])
 
         response = self.client.post(
-            f"/api/deployments/{deployment.id}/photo",
-            data={"file": (io.BytesIO(b"test-image"), "capture.jpg")},
+            f"/api/deployments/{deployment.id}/actions",
+            data={
+                "action_type_id": str(action_type.id),
+                "picture": (io.BytesIO(b"test-image"), "capture.jpg"),
+            },
             headers=headers,
             content_type="multipart/form-data",
         )
 
-        self.assertEqual(response.status_code, 200)
-        photo_url = response.get_json()["pictures"][0]["photo_url"]
-        self.assertTrue(photo_url.startswith("/api/deployments/"))
+        self.assertEqual(response.status_code, 201)
+        picture_url = response.get_json()["picture_url"]
+        self.assertTrue(picture_url.startswith("/api/deployment-actions/"))
 
-        unauthorized = self.client.get(photo_url)
+        unauthorized = self.client.get(picture_url)
         self.assertEqual(unauthorized.status_code, 401)
 
-        authorized = self.client.get(photo_url, headers=headers)
+        authorized = self.client.get(picture_url, headers=headers)
         self.assertEqual(authorized.status_code, 200)
         self.assertEqual(authorized.data, b"test-image")
         authorized.close()

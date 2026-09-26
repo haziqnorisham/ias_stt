@@ -8,13 +8,12 @@ import logging
 from app.models.database import db
 from app.models.deployment import Deployment
 from app.models.deployment_location import DeploymentLocation
-from app.models.notes import Notes
 
 
 logger = logging.getLogger("app.deployment_service")
 
 
-def create_deployment(trap, location=None, notes=None):
+def create_deployment(trap, location=None):
     """Create a new active deployment for *trap*.
 
     Any existing active deployment is closed first (at-most-one-active
@@ -29,14 +28,6 @@ def create_deployment(trap, location=None, notes=None):
     )
     db.session.add(deployment)
     db.session.flush()  # obtain the auto-generated deployment.id
-
-    if notes is not None:
-        db.session.add(
-            Notes(
-                deployment_id=deployment.id,
-                notes=str(notes),
-            )
-        )
 
     if location is not None:
         db.session.add(

@@ -1,46 +1,19 @@
 """Deployment and location-history API endpoints (/api/...)."""
-import os
-import uuid
-import mimetypes
 
-from flask import Blueprint, current_app, jsonify, request, send_file
-from sqlalchemy.exc import IntegrityError
+from flask import Blueprint, current_app, jsonify, request
 
 from app.auth import require_permission
 from app.models.database import db
 from app.models.trap import Trap
 from app.models.deployment import Deployment
 from app.models.deployment_location import DeploymentLocation
-from app.models import deployment_location
-from app.models.picture import Picture
 from app.services import deployment_service
-from app.time_utils import format_app_datetime
-from app.models.notes import Notes
+from app.services.deployment_action_service import remove_stored_file
 
 deployments_bp = Blueprint("deployments", __name__, url_prefix="/api")
 
-ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif"}
 def _error(message, code):
     return jsonify({"error": message}), code
-
-
-def _upload_dir():
-    return os.path.join(current_app.config["DATA_DIR"], "uploads")
-
-
-def _photo_file_path(photo):
-    stored_name = photo.stored_filename
-    if not stored_name or stored_name != os.path.basename(stored_name):
-        return None
-
-    candidates = [
-        os.path.join(_upload_dir(), stored_name),
-        os.path.join(current_app.static_folder, "uploads", stored_name),
-    ]
-    for path in candidates:
-        if os.path.isfile(path):
-            return path
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -85,6 +58,12 @@ def create_deployment_manual():
     if not isinstance(data, dict):
         return _error("Request body must be a JSON object", 400)
 
+    if "notes" in data:
+        return _error(
+            "Deployment-level notes are no longer supported; create a deployment action instead",
+            400,
+        )
+
     trap_id = data.get("trap_id")
     if not trap_id:
         return _error("Field 'trap_id' is required", 400)
@@ -117,6 +96,12 @@ def update_deployment(dep_id):
     if not isinstance(data, dict):
         return _error("Request body must be a JSON object", 400)
 
+    if "notes" in data:
+        return _error(
+            "Deployment-level notes are no longer supported; create a deployment action instead",
+            400,
+        )
+
     if "animal_capture" in data:
         animal_capture = data["animal_capture"]
         if animal_capture is not None and (
@@ -127,16 +112,6 @@ def update_deployment(dep_id):
                 400,
             )
         dep.animal_capture = animal_capture
-
-    if "notes" in data and data["notes"] is not None:
-        if not isinstance(data["notes"], str) or len(data["notes"]) > 5000:
-            return _error(
-                "Field 'notes' must be a string of at most 5000 characters",
-                400,
-            )
-        if data["notes"].strip():
-            new_note = Notes(deployment_id=dep.id, notes=data["notes"])
-            db.session.add(new_note)
 
     try:
         db.session.commit()
@@ -155,6 +130,9 @@ def delete_deployment(dep_id):
     dep = db.session.get(Deployment, dep_id)
     if dep is None:
         return _error("Deployment not found", 404)
+    action_files = [
+        action.stored_filename for action in dep.actions.all()
+    ]
     try:
         db.session.delete(dep)
         db.session.commit()
@@ -162,86 +140,11 @@ def delete_deployment(dep_id):
         db.session.rollback()
         current_app.logger.exception("Failed to delete deployment %s", dep_id)
         return _error("Internal Server Error", 500)
+
+    for stored_filename in action_files:
+        remove_stored_file(stored_filename)
+
     return jsonify({"message": f"Deployment {dep_id} deleted"}), 200
-
-
-# ---------------------------------------------------------------------------
-# Photo upload
-# ---------------------------------------------------------------------------
-def _allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-@deployments_bp.route("/deployments/<int:dep_id>/photo", methods=["POST"])
-@require_permission("deployment_photos:create")
-def upload_photo(dep_id):
-    dep = db.session.get(Deployment, dep_id)
-    if dep is None:
-        return _error("Deployment not found", 404)
-
-    if "file" not in request.files:
-        return _error("No file provided", 400)
-
-    file = request.files["file"]
-    if file.filename == "":
-        return _error("No file selected", 400)
-
-    if not _allowed_file(file.filename):
-        return _error("File type not allowed (jpg, jpeg, png, gif)", 400)
-
-    upload_dir = _upload_dir()
-    os.makedirs(upload_dir, exist_ok=True)
-
-    ext = file.filename.rsplit(".", 1)[1].lower()
-    stored_name = f"{uuid.uuid4().hex}.{ext}"
-    file_path = os.path.join(upload_dir, stored_name)
-    file.save(file_path)
-
-
-    photo_filename = file.filename
-    
-    new_photo = Picture(
-        deployment_id=dep.id,
-        photo_url=stored_name,
-        photo_filename=photo_filename              
-    )
-    
-    db.session.add(new_photo)
-
-    try:
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Failed to save photo for deployment %s", dep_id)
-        return _error("Internal Server Error", 500)
-
-    return jsonify(dep.to_dict()), 200
-
-
-@deployments_bp.route(
-    "/deployments/<int:dep_id>/photos/<int:photo_id>", methods=["GET"]
-)
-@require_permission("deployments:read")
-def get_photo(dep_id, photo_id):
-    dep = db.session.get(Deployment, dep_id)
-    if dep is None:
-        return _error("Deployment not found", 404)
-
-    photo = Picture.query.filter_by(id=photo_id, deployment_id=dep_id).first()
-    if photo is None:
-        return _error("Photo not found", 404)
-
-    file_path = _photo_file_path(photo)
-    if file_path is None:
-        return _error("Photo file not found", 404)
-
-    mimetype = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-    return send_file(
-        file_path,
-        mimetype=mimetype,
-        download_name=photo.photo_filename or photo.stored_filename,
-        conditional=True,
-    )
 
 
 # ---------------------------------------------------------------------------

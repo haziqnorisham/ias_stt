@@ -30,26 +30,15 @@ class Deployment(db.Model):
         cascade="all, delete-orphan",
     )
 
-    pictures = db.relationship(
-        "Picture",
-        backref="deployment",
-        lazy="dynamic",
-        cascade="all, delete-orphan",
-    )
-
-    notes = db.relationship(
-        "Notes",
-        backref="deployment",
+    actions = db.relationship(
+        "DeploymentAction",
+        back_populates="deployment",
         lazy="dynamic",
         cascade="all, delete-orphan",
     )
 
 
     def to_dict(self):
-        pic_list = [p.to_dict() for p in self.pictures.all()] if self.pictures else []
-        latest_pic = pic_list[-1] if pic_list else None
-        note_list = [n.to_dict() for n in self.notes.all()] if self.notes else []
-        latest_note = note_list[-1] if note_list else None
         return {
             "id": self.id,
             "trap_id": self.trap_id,
@@ -57,12 +46,8 @@ class Deployment(db.Model):
             "start_date": format_app_datetime(self.start_date),
             "end_date": format_app_datetime(self.end_date),
             "animal_capture": self.animal_capture,
-            "photo_url": latest_pic["photo_url"] if latest_pic else None,
-            "photo_filename": latest_pic["photo_filename"] if latest_pic else None,
-            "notes": note_list,
             "created_at": format_app_datetime(self.created_at),
             "updated_at": format_app_datetime(self.updated_at),
-            "pictures": pic_list,
         }
 
 

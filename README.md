@@ -20,6 +20,8 @@ web UI for managing traps.
 - **SQLite trap store** (SQLAlchemy) with a `traps` table created on startup.
 - **REST CRUD API** at `/api/traps` (list/get/create/update/delete) with
   validation and proper status codes.
+- **Deployment action history** with administrator-managed action types and
+  immutable, picture-backed actions recorded against active deployments.
 - **Web UI** at `/traps` (Jinja2 + Bootstrap) for full CRUD with search, sort,
   pagination, and notifications. Toggle with `ENABLE_FRONTEND`.
 - **JWT authentication** — local users authenticate through `/auth/login`, then
@@ -43,15 +45,21 @@ web UI for managing traps.
 │   │   ├── auth.py             # JWT login, refresh, me, and logout
 │   │   ├── api.py             # Hello World (/) + /api/auth/verify
 │   │   ├── traps.py           # CRUD API (/api/traps)
+│   │   ├── deployments.py     # Deployment and location APIs
+│   │   ├── deployment_actions.py # Action type and action APIs
 │   │   ├── users.py           # Administrator-only local-user CRUD API
 │   │   ├── uplinks.py         # Uplink history API (/api/uplinks)
 │   │   └── frontend.py        # legacy web UI routes (/traps, /login)
 │   ├── models/
 │   │   ├── database.py        # shared SQLAlchemy instance
 │   │   ├── trap.py            # Trap model
+│   │   ├── deployment.py       # Deployment model
+│   │   ├── deployment_action.py # Immutable deployment action model
+│   │   ├── deployment_action_type.py # Action type model and seeds
 │   │   ├── user.py            # Local JWT user model
 │   │   └── tracker_uplink.py  # Persisted tracker uplink history
 │   ├── services/
+│   │   ├── deployment_action_service.py # Action picture storage helpers
 │   │   └── mqtt_service.py    # MQTT client + init_mqtt(app)
 │   ├── templates/             # traps.html, login.html
 │   └── static/css|js          # style.css, traps.js
@@ -93,8 +101,8 @@ curl http://localhost:5000/
 
 ## API documentation (OpenAPI)
 
-An `openapi.yaml` specification is included in the project root covering all
-22 endpoints, data models, and authentication. Import it into **Bruno**:
+An `openapi.yaml` specification is included in the project root covering the
+API endpoints, data models, and authentication. Import it into **Bruno**:
 
 1. Open Bruno → *Collections* → *Import Collection*
 2. Choose **OpenAPI v3** → select `openapi.yaml`
@@ -383,6 +391,79 @@ curl -X PUT http://localhost:8080/api/traps/1 -H 'Content-Type: application/json
 curl -X DELETE http://localhost:8080/api/traps/1
 # -> 200 {"message": "Trap 1 deleted"}
 ```
+
+## Deployment actions
+
+A deployment represents one active period for a trap. Deployment actions record
+the work performed during that period. Actions are immutable: they cannot be
+updated or individually deleted, and are removed only when their deployment is
+deleted.
+
+### Action types
+
+Action types are stored in `deployment_action_types`. The initial seeded types
+are `bait_added`, `routine_check`, and `bait_removed`.
+
+All authenticated users with deployment read permission can list active action
+types:
+
+```text
+GET /api/deployment-action-types
+```
+
+Only administrators with `settings:admin` can create, update, or delete action
+types. Administrators may update only `label`, `description`, and `is_active`;
+the `code` is immutable. An action type referenced by a deployment action cannot
+be deleted. It must be deactivated instead by setting `is_active` to `false`.
+
+```text
+POST   /api/deployment-action-types
+GET    /api/deployment-action-types/<id>
+PUT    /api/deployment-action-types/<id>
+DELETE /api/deployment-action-types/<id>
+```
+
+Action type timestamps are managed by SQLAlchemy. Clients cannot provide or
+override `created_at` or `updated_at`.
+
+### Creating an action
+
+Actions can be added only to active deployments. Each action requires exactly
+one picture and may include an optional note. The request must use
+`multipart/form-data`:
+
+```text
+POST /api/deployments/<deployment_id>/actions
+```
+
+Form fields:
+
+```text
+action_type_id = 1
+notes = Fresh bait added
+picture = <jpg, jpeg, png, or gif file>
+```
+
+The backend assigns `performed_at` and `performed_by` from the authenticated
+request. These values cannot be supplied or changed by the client.
+
+Deployment action permissions are:
+
+- `deployments:read` to list actions and retrieve action pictures.
+- `deployments:update` to create actions.
+
+```text
+GET /api/deployments/<deployment_id>/actions
+GET /api/deployment-actions/<action_id>/picture
+```
+
+There are no update or delete endpoints for deployment actions. The response
+contains the action type object, optional note, required picture URL and
+filename, action timestamp, and actor username.
+
+Deployment locations remain separate historical records and continue to use
+the existing location endpoints. Deployment-level notes and standalone
+deployment pictures are not supported; notes and pictures belong to actions.
 
 ## Web UI (`/traps`)
 

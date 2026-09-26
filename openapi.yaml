@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: |
     Trap management service with deployment tracking, location
-    history, and photo upload. Telemetry is ingested from the
+    history, and immutable deployment actions with required pictures. Telemetry is ingested from the
     ChirpStack HTTP integration via `POST /api/telemetry/ingest`
     (an optional MQTT listener remains available). Application users obtain
     JWT access and refresh tokens from `/auth/login` and send access tokens in
@@ -34,7 +34,7 @@ tags:
   - name: Traps
     description: Trap device CRUD
   - name: Deployments
-    description: Deployment tracking and location history
+    description: Deployment tracking, immutable actions, and location history
   - name: Notifications
     description: Per-user in-app notification events and state
 
@@ -778,7 +778,6 @@ paths:
             example:
               trap_id: 1
               location: north
-              notes: Initial placement
       responses:
         201:
           description: Deployment created
@@ -829,7 +828,6 @@ paths:
               $ref: '#/components/schemas/DeploymentUpdate'
             example:
               animal_capture: 2 rats
-              notes: Updated notes
       responses:
         200:
           description: Deployment updated
@@ -864,56 +862,220 @@ paths:
         404:
           $ref: '#/components/responses/404'
 
-  /api/deployments/{deployment_id}/photo:
+  /api/deployment-action-types:
+    get:
+      tags: [Deployments]
+      summary: List deployment action types
+      operationId: listDeploymentActionTypes
+      parameters:
+        - name: include_inactive
+          in: query
+          schema: { type: boolean, default: false }
+          description: Include inactive types; administrators only
+      responses:
+        200:
+          description: Deployment action types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeploymentActionType'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+
+    post:
+      tags: [Deployments]
+      summary: Create a deployment action type
+      operationId: createDeploymentActionType
+      description: Administrator-only operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeploymentActionTypeCreate'
+            example:
+              code: bait_added
+              label: Added bait
+              description: Bait was added to the trap.
+              is_active: true
+      responses:
+        201:
+          description: Action type created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentActionType'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+        409:
+          $ref: '#/components/responses/409'
+
+  /api/deployment-action-types/{action_type_id}:
+    parameters:
+      - name: action_type_id
+        in: path
+        required: true
+        schema: { type: integer }
+        description: Deployment action type primary key
+
+    get:
+      tags: [Deployments]
+      summary: Get a deployment action type
+      operationId: getDeploymentActionType
+      responses:
+        200:
+          description: Action type found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentActionType'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
+    put:
+      tags: [Deployments]
+      summary: Update a deployment action type
+      operationId: updateDeploymentActionType
+      description: Administrator-only operation. The code cannot be changed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeploymentActionTypeUpdate'
+            example:
+              label: Added bait
+              description: Updated description.
+              is_active: true
+      responses:
+        200:
+          description: Action type updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentActionType'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+        404:
+          $ref: '#/components/responses/404'
+
+    delete:
+      tags: [Deployments]
+      summary: Delete a deployment action type
+      operationId: deleteDeploymentActionType
+      description: Administrator-only operation. Referenced action types cannot be deleted; deactivate them instead.
+      responses:
+        200:
+          description: Action type deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+        404:
+          $ref: '#/components/responses/404'
+        409:
+          $ref: '#/components/responses/409'
+
+  /api/deployments/{deployment_id}/actions:
     parameters:
       - name: deployment_id
         in: path
         required: true
         schema: { type: integer }
+        description: Deployment primary key ID
+
+    get:
+      tags: [Deployments]
+      summary: List actions for a deployment
+      operationId: listDeploymentActions
+      responses:
+        200:
+          description: Immutable deployment actions, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeploymentAction'
+        401:
+          $ref: '#/components/responses/401'
+        404:
+          $ref: '#/components/responses/404'
+
     post:
       tags: [Deployments]
-      summary: Upload a photo for a deployment
-      operationId: uploadPhoto
+      summary: Create an immutable deployment action
+      operationId: createDeploymentAction
+      description: |
+        Creates an action for an active deployment. The picture is required.
+        `performed_at` and `performed_by` are assigned by the backend. Actions
+        cannot be updated or individually deleted.
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
               type: object
+              required: [action_type_id, picture]
               properties:
-                file:
+                action_type_id:
+                  type: integer
+                  description: Active deployment action type ID
+                notes:
+                  type: string
+                  maxLength: 5000
+                  nullable: true
+                picture:
                   type: string
                   format: binary
-                  description: Image file (jpg, jpeg, png, gif)
-              required: [file]
+                  description: Required image file (jpg, jpeg, png, gif)
       responses:
-        200:
-          description: Photo uploaded; `photo_url` and `photo_filename` are set
+        201:
+          description: Deployment action created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Deployment'
+                $ref: '#/components/schemas/DeploymentAction'
         400:
           $ref: '#/components/responses/400'
         401:
           $ref: '#/components/responses/401'
         404:
           $ref: '#/components/responses/404'
+        409:
+          $ref: '#/components/responses/409'
 
-  /api/deployments/{deployment_id}/photos/{photo_id}:
+  /api/deployment-actions/{action_id}/picture:
     parameters:
-      - name: deployment_id
+      - name: action_id
         in: path
         required: true
         schema: { type: integer }
-      - name: photo_id
-        in: path
-        required: true
-        schema: { type: integer }
+        description: Deployment action primary key ID
     get:
       tags: [Deployments]
-      summary: Retrieve an authenticated deployment photo
-      operationId: getDeploymentPhoto
+      summary: Retrieve an authenticated deployment action picture
+      operationId: getDeploymentActionPicture
       responses:
         200:
           description: Image bytes
@@ -945,10 +1107,10 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/DeploymentLocation'
-        401:
-          $ref: '#/components/responses/401'
         404:
           $ref: '#/components/responses/404'
+        401:
+          $ref: '#/components/responses/401'
 
   /api/deployments/{deployment_id}/locations/latest:
     parameters:
@@ -1329,14 +1491,6 @@ components:
         start_date:        { type: string, format: date-time }
         end_date:          { type: string, format: date-time, nullable: true }
         animal_capture:    { type: string, maxLength: 255, nullable: true }
-        photo_url:         { type: string, maxLength: 500, nullable: true }
-        photo_filename:    { type: string, maxLength: 255, nullable: true }
-        notes:
-          type: array
-          items: { $ref: '#/components/schemas/DeploymentNote' }
-        pictures:
-          type: array
-          items: { $ref: '#/components/schemas/DeploymentPicture' }
         created_at:        { type: string, format: date-time, readOnly: true }
         updated_at:        { type: string, format: date-time, readOnly: true }
 
@@ -1345,33 +1499,55 @@ components:
       properties:
         trap_id:           { type: integer }
         location:          { type: string, maxLength: 50 }
-        notes:             { type: string, maxLength: 500 }
       required: [trap_id]
 
     DeploymentUpdate:
       type: object
       properties:
         animal_capture:    { type: string, maxLength: 255 }
-        notes:             { type: string, maxLength: 500 }
 
-    DeploymentNote:
+    DeploymentActionType:
       type: object
       properties:
-        id: { type: integer }
-        deployment_id: { type: integer }
-        notes: { type: string }
-        created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
+        id:                { type: integer, readOnly: true }
+        code:              { type: string, maxLength: 50, readOnly: true }
+        label:             { type: string, maxLength: 100 }
+        description:      { type: string, maxLength: 500, nullable: true }
+        is_active:         { type: boolean }
+        created_at:        { type: string, format: date-time, readOnly: true }
+        updated_at:        { type: string, format: date-time, readOnly: true }
 
-    DeploymentPicture:
+    DeploymentActionTypeCreate:
       type: object
       properties:
-        id: { type: integer }
-        deployment_id: { type: integer }
-        photo_url: { type: string }
-        photo_filename: { type: string, nullable: true }
-        created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
+        code:
+          type: string
+          maxLength: 50
+          pattern: '^[a-z0-9]+(?:_[a-z0-9]+)*$'
+        label: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 500, nullable: true }
+        is_active: { type: boolean, default: true }
+      required: [code, label]
+
+    DeploymentActionTypeUpdate:
+      type: object
+      properties:
+        label: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 500, nullable: true }
+        is_active: { type: boolean }
+
+    DeploymentAction:
+      type: object
+      properties:
+        id:                { type: integer, readOnly: true }
+        deployment_id:     { type: integer, readOnly: true }
+        action_type:
+          $ref: '#/components/schemas/DeploymentActionType'
+        notes:             { type: string, maxLength: 5000, nullable: true }
+        picture_url:       { type: string, maxLength: 500, readOnly: true }
+        picture_filename:  { type: string, maxLength: 255, readOnly: true }
+        performed_at:      { type: string, format: date-time, readOnly: true }
+        performed_by:      { type: string, maxLength: 150, readOnly: true }
 
     DeploymentLocation:
       type: object
