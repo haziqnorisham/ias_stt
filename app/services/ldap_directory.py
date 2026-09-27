@@ -157,7 +157,7 @@ class LDAPDirectory:
             use_ssl=parsed.scheme == "ldaps",
             tls=tls,
             get_info=ldap["NONE"],
-            connect_timeout=float(self.config.get("LDAP_CONNECT_TIMEOUT", 5)),
+            connect_timeout=int(self.config.get("LDAP_CONNECT_TIMEOUT", 5)),
         )
         if service_bind:
             user = self.config.get("LDAP_BIND_DN")
@@ -170,7 +170,7 @@ class LDAPDirectory:
                 password=password,
                 auto_bind=False,
                 auto_referrals=False,
-                receive_timeout=float(self.config.get("LDAP_RECEIVE_TIMEOUT", 5)),
+                receive_timeout=int(self.config.get("LDAP_RECEIVE_TIMEOUT", 5)),
                 raise_exceptions=False,
             )
             if not connection.open():

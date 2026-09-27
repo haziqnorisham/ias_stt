@@ -287,6 +287,10 @@ class LDAPAuthApiTest(unittest.TestCase):
         )
         self.assertEqual(self.directory.authenticate_calls, [])
 
+    def test_ldap_socket_timeouts_are_integers(self):
+        self.assertIsInstance(LDAPTestConfig.LDAP_CONNECT_TIMEOUT, int)
+        self.assertIsInstance(LDAPTestConfig.LDAP_RECEIVE_TIMEOUT, int)
+
     def test_refresh_checks_directory_account_and_returns_provider_outage(self):
         self._provision_ldap()
         login = self._login("ldap.user", "ldap-password").get_json()

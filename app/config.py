@@ -125,8 +125,10 @@ class Config:
         value.casefold()
         for value in _parse_csv(os.getenv("LDAP_ENABLED_VALUES"), default="true,1,yes")
     }
-    LDAP_CONNECT_TIMEOUT = float(os.getenv("LDAP_CONNECT_TIMEOUT", "5"))
-    LDAP_RECEIVE_TIMEOUT = float(os.getenv("LDAP_RECEIVE_TIMEOUT", "5"))
+    # ldap3's Linux socket implementation packs these values as integers.
+    # Keep them integer-valued to avoid struct.error during connection.open().
+    LDAP_CONNECT_TIMEOUT = int(os.getenv("LDAP_CONNECT_TIMEOUT", "5"))
+    LDAP_RECEIVE_TIMEOUT = int(os.getenv("LDAP_RECEIVE_TIMEOUT", "5"))
     LDAP_SEARCH_LIMIT = int(os.getenv("LDAP_SEARCH_LIMIT", "200"))
 
     # Database (SQLite, file-based)
