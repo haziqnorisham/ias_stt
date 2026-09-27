@@ -1,6 +1,7 @@
 Flask==3.0.3
 Flask-Cors==5.0.0
 Flask-JWT-Extended==4.7.1
+ldap3==2.9.1
 python-dotenv==1.0.1
 paho-mqtt==2.1.0
 Flask-SQLAlchemy==3.1.1

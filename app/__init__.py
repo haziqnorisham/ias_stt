@@ -5,6 +5,7 @@ from logging.handlers import RotatingFileHandler
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.config import Config
 from app.time_utils import AppTimezoneFormatter
@@ -60,6 +61,14 @@ def create_app(config_class: type = Config) -> Flask:
     """Application factory."""
     app = Flask(__name__)
     app.config.from_object(config_class)
+    trusted_proxy_hops = app.config.get("TRUSTED_PROXY_HOPS", 0)
+    if trusted_proxy_hops < 0 or trusted_proxy_hops > 5:
+        raise RuntimeError("TRUSTED_PROXY_HOPS must be between 0 and 5")
+    if trusted_proxy_hops:
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_proto=trusted_proxy_hops,
+        )
     CORS(
         app,
         origins="*",
@@ -112,7 +121,7 @@ def create_app(config_class: type = Config) -> Flask:
     from app.routes.api import api_bp
     from app.routes.auth import auth_bp
     from app.routes.traps import traps_bp
-    from app.routes.users import users_bp
+    from app.routes.users import ldap_users_bp, users_bp
     from app.routes.deployments import deployments_bp
     from app.routes.deployment_actions import deployment_actions_bp
     from app.routes.trackers import trackers_bp
@@ -124,6 +133,7 @@ def create_app(config_class: type = Config) -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(traps_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(ldap_users_bp)
     app.register_blueprint(deployments_bp)
     app.register_blueprint(deployment_actions_bp)
     app.register_blueprint(trackers_bp)

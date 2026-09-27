@@ -488,15 +488,21 @@ Disable it by setting `ENABLE_FRONTEND=false`, after which `/traps` returns
 
 ## Authentication
 
-The API uses local users and stateless JWTs. Create a user with the Flask CLI:
+The API supports `LOCAL` and `LDAP` application users. Both credential providers
+converge on the same Flask-issued JWT; LDAP does not replace JWT and the Vue
+frontend never connects directly to LDAP.
+
+Create or maintain the break-glass LOCAL account with the Flask CLI:
 
 ```
 flask --app run.py create-user admin --role administrator
 ```
 
-The command prompts for a password. User passwords are stored as hashes in the
-local SQLite database. Set a stable JWT signing secret before running in
-production:
+The command prompts for a password. LOCAL passwords are stored as Werkzeug
+PBKDF2 hashes. LDAP passwords are only sent to the backend for a login attempt;
+they are not stored locally or included in tokens. At least one enabled LOCAL
+administrator is protected from deletion, deactivation, or demotion. Set a
+stable JWT signing secret before running in production:
 
 ```
 JWT_SECRET_KEY=long-random-signing-secret
@@ -504,10 +510,13 @@ JWT_ACCESS_TOKEN_MINUTES=15
 JWT_REFRESH_TOKEN_DAYS=7
 ```
 
-**Login** — send local credentials to `/auth/login`:
+**Login** — send either LOCAL or provisioned LDAP credentials to `/auth/login`.
+Flask selects the provider from the local account record; the client does not
+select a provider at login. The backend requires HTTPS for all credential
+submissions:
 
 ```bash
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST https://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"your-password"}'
 ```
@@ -527,26 +536,43 @@ curl -X POST http://localhost:8080/auth/refresh \
   -H "Authorization: Bearer <REFRESH_TOKEN>"
 ```
 
-`GET /auth/me` returns the identity, role, permissions, and access-token
-expiration. `POST /auth/logout` returns `204`; because JWTs are stateless, the
-client must discard both tokens.
+Both providers receive the same login response with access and refresh JWTs.
+JWT `sub` is the local application user ID; claims include the local role,
+provider, and token version, but never directory passwords or bind credentials.
+`GET /auth/me` returns current local profile/role data. Access tokens last 15
+minutes by default and refresh tokens last seven days by default. `POST
+/auth/logout` returns `204`; logout remains client-side and does not revoke a
+copied token.
+
+Each JWT-authenticated API request checks the local user is still present,
+enabled, and on the current token version, and derives current permissions from
+the local role. These checks do not contact LDAP. An application administrator
+disabling a user or changing their role/password invalidates prior tokens. An
+LDAP account disabled in the directory may continue using an already-issued
+access token until its short expiry; LDAP refresh checks directory identity and
+account status and will reject renewal. Refreshing an LDAP session requires the
+directory to be available; LOCAL authentication and refresh are independent of
+LDAP availability.
 
 **Public (no auth required):** `/`, `/api/health`, `/auth/login`, and
 `/auth/logout`. Protected API requests require a valid JWT unless they use the
 explicitly configured legacy service API key.
 
-## Local User Management API
+## User Provisioning API
 
-Local users can be managed by an authenticated administrator through
-`/api/users`. These endpoints require an administrator JWT and do not accept the
-legacy service API key.
+Users can be managed by an authenticated administrator through `/api/users`.
+The create request explicitly chooses `auth_provider` as `LOCAL` or `LDAP`.
+These endpoints require an administrator JWT and do not accept the legacy
+service API key.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/users` | List users. Supports `limit`, `offset`, and `search`. |
-| GET | `/api/users/<id>` | Get one user. |
-| POST | `/api/users` | Create a user. |
-| PUT | `/api/users/<id>` | Update profile, role, password, or active state. |
+| GET | `/api/ldap/users?search=...` | Search directory users to provision (administrator only). |
+| GET | `/api/users` | List application users. Supports `limit`, `offset`, and `search`. |
+| GET | `/api/users/<id>` | Get one application user. |
+| POST | `/api/users` | Create a LOCAL user or provision an LDAP user. |
+| PUT | `/api/users/<id>` | Update locally managed role/status and LOCAL profile/password. |
+| POST | `/api/users/<id>/sync-profile` | Synchronize LDAP-owned profile fields. |
 | DELETE | `/api/users/<id>` | Delete a user. |
 
 Example create request:
@@ -559,6 +585,7 @@ Content-Type: application/json
 
 ```json
 {
+  "auth_provider": "LOCAL",
   "username": "operator",
   "password": "operator-password",
   "display_name": "Field Operator",
@@ -568,13 +595,77 @@ Content-Type: application/json
 }
 ```
 
-Passwords must be at least eight characters. Password hashes are never returned
-by the API. Usernames cannot be changed after creation. The API prevents an
-administrator from deleting, deactivating, or demoting the last active
-administrator, and administrators cannot delete or demote their own account.
+For `LOCAL`, username/password and optional profile fields are supplied by the
+administrator. Passwords must be at least eight characters and hashes are never
+returned.
 
-Because JWTs are stateless, role or active-state changes affect newly issued
-access tokens. Existing access tokens remain valid until their normal expiry.
+For `LDAP`, the administrator searches the directory, selects a result, then
+creates the local application account using its stable subject:
+
+```json
+{
+  "auth_provider": "LDAP",
+  "directory_subject": "<selected-directory-subject>",
+  "role": "field_operator",
+  "is_active": true
+}
+```
+
+The backend retrieves username, display name, and email from LDAP. LDAP password
+and profile fields cannot be supplied in user create/update requests. Roles and
+application enablement remain local. LDAP profile synchronization can update
+the username, display name, and email, but not the local role or enabled state.
+Authentication provider and directory identity cannot be changed after
+provisioning. Directory username collisions with any local user are rejected.
+Keep `LDAP_DIRECTORY_KEY` and the configured stable subject attribute/value
+mapping unchanged for existing accounts; changing the directory key makes
+previously provisioned identities unresolvable until they are explicitly
+reprovisioned or migrated.
+
+`GET /api/ldap/users` requires a search string of at least two characters and
+returns only a bounded result set, without DNs. Configure directory attributes
+to match the actual LLDAP schema or AD deployment; do not assume the development
+and production schemas use identical names. AD uses `objectGUID` as its stable
+identity and checks `userAccountControl`/`accountExpires`. For LLDAP, set
+`LDAP_SUBJECT_ATTRIBUTE` to the verified stable UUID attribute; configure
+`LDAP_ENABLED_ATTRIBUTE` to the deployed LLDAP enabled/disabled attribute (or
+configure `LDAP_USER_FILTER` to exclude disabled accounts) so refresh can reject
+disabled users. If neither is available, LDAP account disablement cannot be
+reliably detected until the directory stops returning that identity.
+
+The API protects the last enabled LOCAL administrator, and administrators
+cannot delete or demote their own account. `password_hash` is null for LDAP
+users.
+
+Because access JWTs are short-lived, directory disablement is detected at LDAP
+refresh rather than on every API request. Local account disablement and token
+version changes are checked on every authenticated API request.
+
+## LDAP Configuration and Transport
+
+LDAP is disabled by default (`LDAP_ENABLED=false`). Configure one directory per
+backend deployment using the `LDAP_*` environment variables in `.env.example`.
+The adapter supports LLDAP and Active Directory with configurable attribute
+mappings. LLDAP and AD attribute names and account-state capabilities must be
+verified against the deployed directory/schema.
+
+- Use `ldaps://` or LDAP with `LDAP_STARTTLS=true` and certificate validation.
+- Keep `LDAP_BIND_DN` and `LDAP_BIND_PASSWORD` only in backend secret
+  configuration. They are never returned or placed in JWTs.
+- LDAP user passwords are bound only for login and never logged or persisted.
+- `LDAP_ALLOW_INSECURE=true` is limited to development/testing configurations.
+- If TLS terminates at a reverse proxy, configure `TRUSTED_PROXY_HOPS` only
+  when Flask is reachable through that trusted proxy; this lets Flask enforce
+  HTTPS for login submissions using the proxy's scheme information.
+- If LDAP is unavailable, LDAP login/refresh fails with `503`; the app still
+  starts and LOCAL login/refresh continues working.
+- LDAP groups are not used for application authorization. Local `role` remains
+  the sole source of application permissions.
+
+The Vue frontend sends credentials only to Flask over HTTPS, uses the returned
+JWT for subsequent API calls, and must preserve its refresh token after a
+transient `503` if it intends to retry when LDAP recovers. No Vue files are
+modified by this backend implementation.
 
 ## Security
 

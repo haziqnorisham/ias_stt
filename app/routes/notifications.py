@@ -1,8 +1,7 @@
 """Per-user notification API endpoints (/api/notifications)."""
 from datetime import datetime, timezone
 
-from flask import Blueprint, current_app, jsonify, request
-from flask_jwt_extended import get_jwt_identity
+from flask import Blueprint, current_app, g, jsonify, request
 from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 
@@ -38,11 +37,12 @@ def _not_found():
 
 
 def _current_user():
-    """Resolve the authenticated JWT identity to an active user row."""
-    username = get_jwt_identity()
-    if not username:
+    """Resolve the already-validated JWT principal to its local user row."""
+    principal = getattr(g, "auth_principal", None) or {}
+    user_id = principal.get("user_id")
+    if not user_id:
         return None
-    user = User.query.filter_by(username=str(username)).first()
+    user = db.session.get(User, user_id)
     if user is None or not user.is_active:
         return None
     return user

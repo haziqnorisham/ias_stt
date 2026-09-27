@@ -66,6 +66,7 @@ class UsersApiTest(unittest.TestCase):
         created = self.client.post(
             "/api/users",
             json={
+                "auth_provider": "LOCAL",
                 "username": "viewer",
                 "password": "viewer-password",
                 "role": "read_only",
@@ -112,6 +113,7 @@ class UsersApiTest(unittest.TestCase):
         created = self.client.post(
             "/api/users",
             json={
+                "auth_provider": "LOCAL",
                 "username": "blocked",
                 "password": "blocked-password",
                 "role": "read_only",
@@ -125,7 +127,11 @@ class UsersApiTest(unittest.TestCase):
 
         missing_role = self.client.post(
             "/api/users",
-            json={"username": "missing-role", "password": "password"},
+            json={
+                "auth_provider": "LOCAL",
+                "username": "missing-role",
+                "password": "password",
+            },
             headers=headers,
         )
         self.assertEqual(missing_role.status_code, 422)
@@ -133,6 +139,7 @@ class UsersApiTest(unittest.TestCase):
         short_password = self.client.post(
             "/api/users",
             json={
+                "auth_provider": "LOCAL",
                 "username": "short-password",
                 "password": "short",
                 "role": "read_only",
@@ -144,6 +151,7 @@ class UsersApiTest(unittest.TestCase):
         duplicate = self.client.post(
             "/api/users",
             json={
+                "auth_provider": "LOCAL",
                 "username": "operator",
                 "password": "operator-password",
                 "role": "field_operator",

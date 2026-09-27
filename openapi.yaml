@@ -76,8 +76,13 @@ paths:
   /auth/login:
     post:
       tags: [Auth]
-      summary: Authenticate a local user
+      summary: Authenticate a LOCAL or LDAP-provisioned user
       operationId: login
+      description: |
+        LDAP credentials are accepted only over HTTPS. The backend selects the
+        provider from the provisioned local application account. LDAP failures
+        never fall back to LOCAL password verification. Both providers receive
+        the same application JWT response.
       security: []
       requestBody:
         required: true
@@ -96,10 +101,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
+        400:
+          $ref: '#/components/responses/400'
         401:
           $ref: '#/components/responses/401'
         403:
           $ref: '#/components/responses/403'
+        503:
+          $ref: '#/components/responses/503'
+
+  /api/ldap/users:
+    get:
+      tags: [Users]
+      summary: Search directory identities for administrator provisioning
+      operationId: searchDirectoryUsers
+      description: Administrator-only. Returns profile fields and a stable opaque directory subject; never returns a DN or credentials.
+      parameters:
+        - name: search
+          in: query
+          required: true
+          schema: { type: string, minLength: 2 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        200:
+          description: Directory search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DirectoryUser' }
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+        422:
+          $ref: '#/components/responses/422'
+        503:
+          $ref: '#/components/responses/503'
 
   /auth/me:
     get:
@@ -134,6 +177,8 @@ paths:
                   expires_in: { type: integer, example: 900 }
         401:
           $ref: '#/components/responses/401'
+        503:
+          $ref: '#/components/responses/503'
 
   /auth/logout:
     post:
@@ -148,7 +193,7 @@ paths:
   /api/users:
     get:
       tags: [Users]
-      summary: List local users
+      summary: List provisioned application users
       operationId: listUsers
       parameters:
         - $ref: '#/components/parameters/limit'
@@ -174,7 +219,7 @@ paths:
 
     post:
       tags: [Users]
-      summary: Create a local user
+      summary: Create a LOCAL user or provision an LDAP user
       operationId: createUser
       requestBody:
         required: true
@@ -193,10 +238,14 @@ paths:
           $ref: '#/components/responses/401'
         403:
           $ref: '#/components/responses/403'
+        404:
+          $ref: '#/components/responses/404'
         409:
           $ref: '#/components/responses/409'
         422:
           $ref: '#/components/responses/422'
+        503:
+          $ref: '#/components/responses/503'
 
   /api/users/{user_id}:
     parameters:
@@ -206,7 +255,7 @@ paths:
         schema: { type: integer }
     get:
       tags: [Users]
-      summary: Get a local user
+      summary: Get an application user
       operationId: getUser
       responses:
         200:
@@ -224,7 +273,7 @@ paths:
 
     put:
       tags: [Users]
-      summary: Update a local user
+      summary: Update application-managed user fields
       operationId: updateUser
       requestBody:
         required: true
@@ -249,6 +298,34 @@ paths:
           $ref: '#/components/responses/409'
         422:
           $ref: '#/components/responses/422'
+
+  /api/users/{user_id}/sync-profile:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Users]
+      summary: Synchronize an LDAP user's profile
+      operationId: syncLdapUserProfile
+      description: Administrator-only. Updates directory-owned username, display name, and email; local role and enabled status are preserved.
+      responses:
+        200:
+          description: Synchronized application user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+        404:
+          $ref: '#/components/responses/404'
+        409:
+          $ref: '#/components/responses/409'
+        503:
+          $ref: '#/components/responses/503'
 
     delete:
       tags: [Users]
@@ -1256,13 +1333,25 @@ components:
     AuthUser:
       type: object
       properties:
+        id: { type: integer }
         username: { type: string }
         display_name: { type: string, nullable: true }
         email: { type: string, nullable: true }
         role: { type: string, enum: [administrator, field_operator, read_only] }
+        auth_provider: { type: string, enum: [LOCAL, LDAP] }
         permissions:
           type: array
           items: { type: string }
+
+    DirectoryUser:
+      type: object
+      properties:
+        directory_key: { type: string }
+        directory_subject: { type: string, description: Stable directory identity used for provisioning. }
+        username: { type: string }
+        display_name: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        is_enabled: { type: boolean, nullable: true }
 
     LoginResponse:
       type: object
@@ -1289,6 +1378,10 @@ components:
       properties:
         id: { type: integer, readOnly: true }
         username: { type: string, maxLength: 150, readOnly: true }
+        auth_provider: { type: string, enum: [LOCAL, LDAP], readOnly: true }
+        directory_key: { type: string, maxLength: 100, nullable: true, readOnly: true }
+        directory_subject: { type: string, maxLength: 255, nullable: true, readOnly: true }
+        ldap_synced_at: { type: string, format: date-time, nullable: true, readOnly: true }
         display_name: { type: string, maxLength: 255, nullable: true }
         email: { type: string, maxLength: 255, nullable: true }
         role:
@@ -1300,10 +1393,13 @@ components:
 
     UserCreate:
       type: object
-      required: [username, password, role]
+      description: Supply the fields appropriate to the selected provider. LDAP profile data is resolved by the backend from directory_subject.
+      required: [auth_provider, role]
       properties:
+        auth_provider: { type: string, enum: [LOCAL, LDAP] }
         username: { type: string, maxLength: 150 }
         password: { type: string, format: password, minLength: 8, writeOnly: true }
+        directory_subject: { type: string, maxLength: 255, writeOnly: true }
         display_name: { type: string, maxLength: 255, nullable: true }
         email: { type: string, maxLength: 255, nullable: true }
         role:
@@ -1628,3 +1724,13 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             error: Internal Server Error
+    503:
+      description: The configured LDAP authentication provider is unavailable or misconfigured
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: AUTH_PROVIDER_UNAVAILABLE
+              message: The authentication service is temporarily unavailable.

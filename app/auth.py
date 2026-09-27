@@ -12,6 +12,9 @@ from flask_jwt_extended import (
 )
 from flask_jwt_extended.exceptions import JWTExtendedException
 
+from app.models.database import db
+from app.models.user import User
+
 
 ROLE_PERMISSIONS = {
     "administrator": {
@@ -106,8 +109,39 @@ def _verify_jwt(refresh=False):
 
     claims = get_jwt()
     identity = get_jwt_identity()
-    role = claims.get("role")
-    if not identity or role not in ROLE_PERMISSIONS:
+    try:
+        user_id = int(identity)
+    except (TypeError, ValueError):
+        return None, auth_error(
+            "INVALID_TOKEN",
+            "The authentication token is invalid or expired.",
+            401,
+        )
+
+    user = db.session.get(User, user_id)
+    if user is None or not user.is_active:
+        return None, auth_error(
+            "AUTHENTICATION_REQUIRED",
+            "Authentication is required.",
+            401,
+        )
+    if user.role not in ROLE_PERMISSIONS:
+        return None, auth_error(
+            "AUTHENTICATION_REQUIRED",
+            "Authentication is required.",
+            401,
+        )
+    try:
+        token_version = int(claims.get("token_version", -1))
+    except (TypeError, ValueError):
+        token_version = -1
+    if token_version != user.token_version:
+        return None, auth_error(
+            "AUTHENTICATION_REQUIRED",
+            "Authentication is required.",
+            401,
+        )
+    if claims.get("auth_provider") != user.auth_provider:
         return None, auth_error(
             "INVALID_TOKEN",
             "The authentication token is invalid or expired.",
@@ -116,11 +150,14 @@ def _verify_jwt(refresh=False):
 
     return {
         "type": "user",
-        "username": str(identity),
-        "role": role,
-        "permissions": permissions_for_role(role),
-        "display_name": claims.get("display_name"),
-        "email": claims.get("email"),
+        "user_id": user.id,
+        "user": user,
+        "username": user.username,
+        "role": user.role,
+        "permissions": permissions_for_role(user.role),
+        "display_name": user.display_name,
+        "email": user.email,
+        "auth_provider": user.auth_provider,
         "claims": claims,
     }, None
 

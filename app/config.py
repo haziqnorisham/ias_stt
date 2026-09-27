@@ -91,10 +91,43 @@ class Config:
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(
         days=int(os.getenv("JWT_REFRESH_TOKEN_DAYS", "7"))
     )
+    TRUSTED_PROXY_HOPS = int(os.getenv("TRUSTED_PROXY_HOPS", "0"))
     API_KEY_PERMISSIONS = _parse_csv(
         os.getenv("API_KEY_PERMISSIONS"),
         default="*",
     )
+
+    # LDAP is opt-in so development and break-glass LOCAL authentication remain
+    # available even when no directory is configured.
+    LDAP_ENABLED = _env_bool("LDAP_ENABLED", False)
+    LDAP_DIRECTORY_KEY = os.getenv("LDAP_DIRECTORY_KEY", "primary").strip()
+    LDAP_DIRECTORY_TYPE = os.getenv("LDAP_DIRECTORY_TYPE", "lldap").strip().lower()
+    LDAP_SERVER_URI = _env_optional("LDAP_SERVER_URI")
+    LDAP_STARTTLS = _env_bool("LDAP_STARTTLS", False)
+    LDAP_ALLOW_INSECURE = _env_bool("LDAP_ALLOW_INSECURE", False)
+    LDAP_CA_CERT_FILE = _env_optional("LDAP_CA_CERT_FILE")
+    LDAP_BIND_DN = _env_optional("LDAP_BIND_DN")
+    LDAP_BIND_PASSWORD = _env_optional("LDAP_BIND_PASSWORD")
+    LDAP_SEARCH_BASE = _env_optional("LDAP_SEARCH_BASE")
+    LDAP_USER_FILTER = os.getenv("LDAP_USER_FILTER", "(objectClass=person)").strip()
+    LDAP_USERNAME_ATTRIBUTE = os.getenv("LDAP_USERNAME_ATTRIBUTE", "uid").strip()
+    LDAP_LOGIN_ATTRIBUTES = _parse_csv(
+        os.getenv("LDAP_LOGIN_ATTRIBUTES"),
+        default=LDAP_USERNAME_ATTRIBUTE,
+    )
+    LDAP_SUBJECT_ATTRIBUTE = _env_optional("LDAP_SUBJECT_ATTRIBUTE")
+    LDAP_DISPLAY_NAME_ATTRIBUTE = os.getenv(
+        "LDAP_DISPLAY_NAME_ATTRIBUTE", "displayName"
+    ).strip()
+    LDAP_EMAIL_ATTRIBUTE = os.getenv("LDAP_EMAIL_ATTRIBUTE", "mail").strip()
+    LDAP_ENABLED_ATTRIBUTE = _env_optional("LDAP_ENABLED_ATTRIBUTE")
+    LDAP_ENABLED_VALUES = {
+        value.casefold()
+        for value in _parse_csv(os.getenv("LDAP_ENABLED_VALUES"), default="true,1,yes")
+    }
+    LDAP_CONNECT_TIMEOUT = float(os.getenv("LDAP_CONNECT_TIMEOUT", "5"))
+    LDAP_RECEIVE_TIMEOUT = float(os.getenv("LDAP_RECEIVE_TIMEOUT", "5"))
+    LDAP_SEARCH_LIMIT = int(os.getenv("LDAP_SEARCH_LIMIT", "200"))
 
     # Database (SQLite, file-based)
     SQLALCHEMY_DATABASE_URI = os.getenv(
