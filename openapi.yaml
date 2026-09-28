@@ -22,7 +22,7 @@ tags:
   - name: Health
     description: Public service health checks
   - name: Auth
-    description: Local-user JWT authentication
+    description: LOCAL and LDAP user JWT authentication
   - name: Users
     description: Administrator-only local-user management
   - name: Telemetry
@@ -79,10 +79,16 @@ paths:
       summary: Authenticate a LOCAL or LDAP-provisioned user
       operationId: login
       description: |
-        LDAP credentials are accepted only over HTTPS. The backend selects the
-        provider from the provisioned local application account. LDAP failures
-        never fall back to LOCAL password verification. Both providers receive
-        the same application JWT response.
+        LOCAL and LDAP credentials are accepted over HTTP or HTTPS. The username
+        must match an active account in the application database, ignoring case
+        and surrounding whitespace. Unknown usernames are rejected without
+        contacting LDAP. The backend selects the provider from that account.
+        LDAP users are resolved by their stored stable directory identity before
+        binding; directory username changes must be synchronized before login.
+        Directory connections support plain LDAP, LDAPS, or LDAP with StartTLS
+        in any environment; directory TLS is optional.
+        LDAP failures never fall back to LOCAL password verification. Both
+        providers receive the same application JWT response.
       security: []
       requestBody:
         required: true

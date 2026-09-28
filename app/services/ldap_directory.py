@@ -85,15 +85,6 @@ class LDAPDirectory:
         if parsed.scheme not in {"ldap", "ldaps"} or not parsed.hostname:
             raise DirectoryUnavailable("LDAP_SERVER_URI must use ldap:// or ldaps://")
         starttls = bool(self.config.get("LDAP_STARTTLS"))
-        allow_insecure = bool(self.config.get("LDAP_ALLOW_INSECURE"))
-        if allow_insecure and not (
-            self.config.get("TESTING") or self.config.get("DEBUG")
-        ):
-            raise DirectoryUnavailable(
-                "Insecure LDAP transport is permitted only in development or tests"
-            )
-        if parsed.scheme == "ldap" and not starttls and not allow_insecure:
-            raise DirectoryUnavailable("LDAP connections must use TLS")
 
         directory_type = self.config.get("LDAP_DIRECTORY_TYPE", "lldap")
         if directory_type not in {"lldap", "active_directory"}:
@@ -147,10 +138,12 @@ class LDAPDirectory:
     def _connection(self, user=None, password=None, service_bind=False):
         ldap = self._ldap_modules()
         parsed, starttls, _ = self._settings()
-        tls = ldap["Tls"](
-            validate=ssl.CERT_REQUIRED,
-            ca_certs_file=self.config.get("LDAP_CA_CERT_FILE"),
-        )
+        tls = None
+        if parsed.scheme == "ldaps" or starttls:
+            tls = ldap["Tls"](
+                validate=ssl.CERT_REQUIRED,
+                ca_certs_file=self.config.get("LDAP_CA_CERT_FILE"),
+            )
         server = ldap["Server"](
             parsed.hostname,
             port=parsed.port or (636 if parsed.scheme == "ldaps" else 389),

@@ -1,7 +1,8 @@
 import json
+import ssl
 import unittest
 from dataclasses import replace
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 from flask_jwt_extended import decode_token
 from sqlalchemy import create_engine, inspect
@@ -12,6 +13,7 @@ from app.models.database import db
 from app.models.user import User
 from app.schema_migrations import upgrade_schema
 from app.services.ldap_directory import (
+    LDAPDirectory,
     DirectoryIdentity,
     DirectoryInvalidCredentials,
     DirectoryUnavailable,
@@ -216,7 +218,19 @@ class LDAPAuthApiTest(unittest.TestCase):
 
     def test_ldap_login_syncs_profile_and_issues_normal_local_id_jwt(self):
         provisioned = self._provision_ldap()
-        response = self._login("ldap.user", "ldap-password")
+        identity = replace(
+            self.directory.identities["stable-id-001"],
+            dn="uid=ldap.user,ou=moved,dc=example,dc=test",
+            display_name="Updated LDAP User",
+            email="updated@example.test",
+        )
+        self.directory.identities["stable-id-001"] = identity
+        self.directory.lookup_calls.clear()
+        with patch.object(
+            self.directory, "authenticate", wraps=self.directory.authenticate
+        ) as authenticate:
+            response = self._login("ldap.user", "ldap-password")
+            authenticate.assert_called_once_with(identity, "ldap-password")
 
         self.assertEqual(response.status_code, 200, response.get_json())
         body = response.get_json()
@@ -224,6 +238,12 @@ class LDAPAuthApiTest(unittest.TestCase):
         self.assertEqual(body["user"]["auth_provider"], "LDAP")
         self.assertEqual(body["user"]["role"], "field_operator")
         self.assertEqual(self.directory.authenticate_calls[-1], ("stable-id-001", "ldap-password"))
+        self.assertEqual(self.directory.lookup_calls, [("subject", "stable-id-001")])
+        user = db.session.get(User, provisioned["id"])
+        self.assertEqual(user.ldap_dn, identity.dn)
+        self.assertEqual(user.display_name, identity.display_name)
+        self.assertEqual(user.email, identity.email)
+        self.assertIsNotNone(user.ldap_synced_at)
 
         claims = decode_token(body["access_token"])
         self.assertEqual(claims["sub"], str(provisioned["id"]))
@@ -245,9 +265,19 @@ class LDAPAuthApiTest(unittest.TestCase):
         )
 
     def test_unprovisioned_ldap_identity_cannot_sign_in(self):
-        response = self._login("ldap.user", "ldap-password")
-
-        self.assertEqual(response.status_code, 401)
+        for unavailable in (False, True):
+            with self.subTest(directory_unavailable=unavailable):
+                self.directory.unavailable = unavailable
+                with patch(
+                    "app.routes.auth.get_ldap_directory", return_value=self.directory
+                ) as directory_factory:
+                    response = self._login("ldap.user", "ldap-password")
+                self.assertEqual(response.status_code, 401)
+                self.assertEqual(
+                    response.get_json()["error"]["code"], "INVALID_CREDENTIALS"
+                )
+                directory_factory.assert_not_called()
+        self.assertEqual(self.directory.lookup_calls, [])
         self.assertEqual(self.directory.authenticate_calls, [])
 
     def test_locally_disabled_ldap_user_cannot_login_after_directory_rename(self):
@@ -260,10 +290,50 @@ class LDAPAuthApiTest(unittest.TestCase):
             username="ldap.renamed",
         )
 
-        response = self._login("ldap.renamed", "ldap-password")
-
-        self.assertEqual(response.status_code, 401)
+        self.directory.lookup_calls.clear()
+        for username in ("ldap.user", "ldap.renamed"):
+            with self.subTest(username=username):
+                response = self._login(username, "ldap-password")
+                self.assertEqual(response.status_code, 401)
+        self.assertEqual(self.directory.lookup_calls, [])
         self.assertEqual(self.directory.authenticate_calls, [])
+
+    def test_ldap_username_rename_requires_profile_sync_before_login(self):
+        provisioned = self._provision_ldap()
+        self.directory.identities["stable-id-001"] = replace(
+            self.directory.identities["stable-id-001"],
+            username="ldap.renamed",
+        )
+        self.directory.lookup_calls.clear()
+
+        old_username = self._login("ldap.user", "ldap-password")
+        self.assertEqual(old_username.status_code, 401)
+        self.assertEqual(self.directory.lookup_calls, [("subject", "stable-id-001")])
+        self.directory.lookup_calls.clear()
+        new_username = self._login("ldap.renamed", "ldap-password")
+        self.assertEqual(new_username.status_code, 401)
+        self.assertEqual(self.directory.lookup_calls, [])
+        self.assertEqual(self.directory.authenticate_calls, [])
+
+        synced = self.client.post(
+            f"/api/users/{provisioned['id']}/sync-profile",
+            headers=self._headers(),
+        )
+        self.assertEqual(synced.status_code, 200)
+        login = self._login("ldap.renamed", "ldap-password")
+        self.assertEqual(login.status_code, 200, login.get_json())
+        self.assertEqual(login.get_json()["user"]["id"], provisioned["id"])
+
+    def test_login_matches_application_username_case_insensitively(self):
+        self._provision_ldap()
+        for username, password, provider in (
+            (" OPERATOR ", "operator-password", "LOCAL"),
+            (" LDAP.USER ", "ldap-password", "LDAP"),
+        ):
+            with self.subTest(provider=provider):
+                response = self._login(username, password)
+                self.assertEqual(response.status_code, 200, response.get_json())
+                self.assertEqual(response.get_json()["user"]["auth_provider"], provider)
 
     def test_local_authentication_does_not_depend_on_ldap(self):
         self.directory.unavailable = True
@@ -343,23 +413,33 @@ class LDAPAuthApiTest(unittest.TestCase):
         rejected = self.client.get("/api/traps", headers=headers)
         self.assertEqual(rejected.status_code, 401)
 
-    def test_ldap_credentials_are_rejected_over_plain_http(self):
+    def test_ldap_credentials_are_accepted_over_plain_http_outside_testing(self):
         self._provision_ldap()
         self.app.config["TESTING"] = False
+        self.app.config["DEBUG"] = False
 
         response = self._login("ldap.user", "ldap-password", secure=False)
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json()["error"]["code"], "HTTPS_REQUIRED")
-        self.assertEqual(self.directory.authenticate_calls, [])
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertEqual(response.get_json()["user"]["auth_provider"], "LDAP")
+        self.assertIn("access_token", response.get_json())
+        self.assertIn("refresh_token", response.get_json())
+        self.assertEqual(
+            self.directory.authenticate_calls, [("stable-id-001", "ldap-password")]
+        )
 
-    def test_local_credentials_are_also_rejected_over_plain_http(self):
+    def test_local_credentials_are_accepted_over_plain_http_outside_testing(self):
         self.app.config["TESTING"] = False
+        self.app.config["DEBUG"] = False
 
         response = self._login("operator", "operator-password", secure=False)
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json()["error"]["code"], "HTTPS_REQUIRED")
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertEqual(response.get_json()["user"]["auth_provider"], "LOCAL")
+        self.assertIn("access_token", response.get_json())
+        self.assertIn("refresh_token", response.get_json())
+        self.assertEqual(self.directory.lookup_calls, [])
+        self.assertEqual(self.directory.authenticate_calls, [])
 
     def test_directory_search_is_admin_only_and_does_not_return_dn(self):
         headers = self._headers()
@@ -428,6 +508,125 @@ class LDAPAuthApiTest(unittest.TestCase):
             headers=headers,
         )
         self.assertEqual(deleted.status_code, 409)
+
+
+class LDAPDirectoryTransportTest(unittest.TestCase):
+    def setUp(self):
+        self.config = {
+            "LDAP_ENABLED": True,
+            "LDAP_DIRECTORY_KEY": "test-directory",
+            "LDAP_DIRECTORY_TYPE": "lldap",
+            "LDAP_SERVER_URI": "ldap://directory.example.test",
+            "LDAP_STARTTLS": False,
+            "LDAP_BIND_DN": "cn=readonly,dc=example,dc=test",
+            "LDAP_BIND_PASSWORD": "service-password",
+            "LDAP_SEARCH_BASE": "dc=example,dc=test",
+            "LDAP_SUBJECT_ATTRIBUTE": "uuid",
+            "LDAP_CA_CERT_FILE": "/unused/custom-ca.pem",
+            "TESTING": False,
+            "DEBUG": False,
+        }
+
+    def test_plain_ldap_service_and_user_binds_work_in_production_without_opt_in(self):
+        for legacy_allow_insecure in (None, False, True):
+            config = dict(self.config)
+            if legacy_allow_insecure is not None:
+                config["LDAP_ALLOW_INSECURE"] = legacy_allow_insecure
+            for service_bind in (False, True):
+                with (
+                    self.subTest(
+                        legacy_allow_insecure=legacy_allow_insecure,
+                        service_bind=service_bind,
+                    ),
+                    patch("ldap3.Tls") as tls_factory,
+                    patch("ldap3.Server") as server_factory,
+                    patch("ldap3.Connection") as connection_factory,
+                ):
+                    connection = Mock()
+                    connection.open.return_value = True
+                    connection.bind.return_value = True
+                    connection_factory.return_value = connection
+
+                    bound = LDAPDirectory(config)._connection(
+                        user="uid=person,dc=example,dc=test",
+                        password="user-password",
+                        service_bind=service_bind,
+                    )
+
+                    self.assertIs(bound, connection)
+                    tls_factory.assert_not_called()
+                    self.assertFalse(server_factory.call_args.kwargs["use_ssl"])
+                    self.assertIsNone(server_factory.call_args.kwargs["tls"])
+                    self.assertEqual(server_factory.call_args.kwargs["port"], 389)
+                    credentials = connection_factory.call_args.kwargs
+                    self.assertEqual(
+                        credentials["user"],
+                        config["LDAP_BIND_DN"] if service_bind
+                        else "uid=person,dc=example,dc=test",
+                    )
+                    self.assertEqual(
+                        credentials["password"],
+                        config["LDAP_BIND_PASSWORD"] if service_bind
+                        else "user-password",
+                    )
+                    self.assertEqual(
+                        connection.method_calls, [call.open(), call.bind()]
+                    )
+
+    def test_ldaps_and_starttls_are_optional_with_certificate_validation(self):
+        for scheme, starttls, port in (("ldaps", False, 636), ("ldap", True, 389)):
+            with (
+                self.subTest(scheme=scheme, starttls=starttls),
+                patch("ldap3.Tls") as tls_factory,
+                patch("ldap3.Server") as server_factory,
+                patch("ldap3.Connection") as connection_factory,
+            ):
+                config = dict(
+                    self.config,
+                    LDAP_SERVER_URI=f"{scheme}://directory.example.test",
+                    LDAP_STARTTLS=starttls,
+                )
+                connection = Mock()
+                connection.open.return_value = True
+                connection.start_tls.return_value = True
+                connection.bind.return_value = True
+                connection_factory.return_value = connection
+
+                LDAPDirectory(config)._connection(service_bind=True)
+
+                tls_factory.assert_called_once_with(
+                    validate=ssl.CERT_REQUIRED,
+                    ca_certs_file=config["LDAP_CA_CERT_FILE"],
+                )
+                self.assertEqual(
+                    server_factory.call_args.kwargs["use_ssl"], scheme == "ldaps"
+                )
+                self.assertEqual(server_factory.call_args.kwargs["port"], port)
+                self.assertIs(
+                    server_factory.call_args.kwargs["tls"], tls_factory.return_value
+                )
+                expected_calls = [call.open()]
+                if starttls:
+                    expected_calls.append(call.start_tls())
+                expected_calls.append(call.bind())
+                self.assertEqual(connection.method_calls, expected_calls)
+
+    def test_configured_starttls_failure_does_not_bind_in_plaintext(self):
+        config = dict(self.config, LDAP_STARTTLS=True)
+        connection = Mock()
+        connection.open.return_value = True
+        connection.start_tls.return_value = False
+        with (
+            patch("ldap3.Tls"),
+            patch("ldap3.Server"),
+            patch("ldap3.Connection", return_value=connection),
+        ):
+            with self.assertRaisesRegex(
+                DirectoryUnavailable, "Unable to establish LDAP TLS"
+            ):
+                LDAPDirectory(config)._connection(service_bind=True)
+        connection.bind.assert_not_called()
+        connection.unbind.assert_called_once_with()
 
 
 class UserSchemaMigrationTest(unittest.TestCase):

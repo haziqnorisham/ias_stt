@@ -489,8 +489,7 @@ Disable it by setting `ENABLE_FRONTEND=false`, after which `/traps` returns
 ## Authentication
 
 The API supports `LOCAL` and `LDAP` application users. Both credential providers
-converge on the same Flask-issued JWT; LDAP does not replace JWT and the Vue
-frontend never connects directly to LDAP.
+converge on the same Flask-issued JWT.
 
 Create or maintain the break-glass LOCAL account with the Flask CLI:
 
@@ -511,15 +510,25 @@ JWT_REFRESH_TOKEN_DAYS=7
 ```
 
 **Login** — send either LOCAL or provisioned LDAP credentials to `/auth/login`.
-Flask selects the provider from the local account record; the client does not
-select a provider at login. The backend requires HTTPS for all credential
-submissions:
+The backend first looks up the username in the application database, ignoring
+case and surrounding whitespace. Missing, ambiguous, or inactive accounts are
+rejected with `401 INVALID_CREDENTIALS` without contacting LDAP. Flask selects
+the provider from the application account record; the client does not select a
+provider at login. Both HTTP and HTTPS requests are accepted:
 
 ```bash
-curl -X POST https://localhost:8080/auth/login \
+curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"your-password"}'
 ```
+
+LOCAL accounts are verified against their stored password hash. For LDAP
+accounts, the backend resolves the stored stable directory subject to obtain
+the current DN, checks the directory identity and account status, then binds
+with the submitted password. Login does not search LDAP for unknown usernames
+or alternative login names. If a directory username changes, synchronize the
+application account through `POST /api/users/<id>/sync-profile` before login
+with the new username.
 
 The response contains an access token and refresh token. Include the access
 token on protected requests:
@@ -649,23 +658,27 @@ The adapter supports LLDAP and Active Directory with configurable attribute
 mappings. LLDAP and AD attribute names and account-state capabilities must be
 verified against the deployed directory/schema.
 
-- Use `ldaps://` or LDAP with `LDAP_STARTTLS=true` and certificate validation.
+- Plain `ldap://` with `LDAP_STARTTLS=false` is accepted in every environment,
+  including production. LDAPS and StartTLS are optional: use `ldaps://` or
+  `ldap://` with `LDAP_STARTTLS=true` when encryption is desired. Certificate
+  validation applies when either TLS mode is selected; `LDAP_CA_CERT_FILE`
+  supports a custom CA.
 - Keep `LDAP_BIND_DN` and `LDAP_BIND_PASSWORD` only in backend secret
   configuration. They are never returned or placed in JWTs.
 - LDAP user passwords are bound only for login and never logged or persisted.
-- `LDAP_ALLOW_INSECURE=true` is limited to development/testing configurations.
+- `LDAP_ALLOW_INSECURE` is no longer required; existing values are ignored.
+  Directory transport is selected by `LDAP_SERVER_URI` and `LDAP_STARTTLS`.
 - If TLS terminates at a reverse proxy, configure `TRUSTED_PROXY_HOPS` only
-  when Flask is reachable through that trusted proxy; this lets Flask enforce
-  HTTPS for login submissions using the proxy's scheme information.
+  when Flask is reachable through that trusted proxy; Flask uses the proxy's
+  forwarded scheme information for the request.
 - If LDAP is unavailable, LDAP login/refresh fails with `503`; the app still
   starts and LOCAL login/refresh continues working.
 - LDAP groups are not used for application authorization. Local `role` remains
   the sole source of application permissions.
 
-The Vue frontend sends credentials only to Flask over HTTPS, uses the returned
-JWT for subsequent API calls, and must preserve its refresh token after a
-transient `503` if it intends to retry when LDAP recovers. No Vue files are
-modified by this backend implementation.
+API clients submit credentials to Flask over HTTP or HTTPS and use the returned
+JWT for subsequent API calls. Preserve the refresh token after a transient
+`503` to retry when LDAP recovers.
 
 ## Security
 

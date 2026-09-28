@@ -104,7 +104,6 @@ class Config:
     LDAP_DIRECTORY_TYPE = os.getenv("LDAP_DIRECTORY_TYPE", "lldap").strip().lower()
     LDAP_SERVER_URI = _env_optional("LDAP_SERVER_URI")
     LDAP_STARTTLS = _env_bool("LDAP_STARTTLS", False)
-    LDAP_ALLOW_INSECURE = _env_bool("LDAP_ALLOW_INSECURE", False)
     LDAP_CA_CERT_FILE = _env_optional("LDAP_CA_CERT_FILE")
     LDAP_BIND_DN = _env_optional("LDAP_BIND_DN")
     LDAP_BIND_PASSWORD = _env_optional("LDAP_BIND_PASSWORD")

@@ -70,15 +70,7 @@ def _provider_unavailable():
     )
 
 
-def _https_required():
-    return auth_error(
-        "HTTPS_REQUIRED",
-        "Credentials must be submitted over HTTPS.",
-        400,
-    )
-
-
-def _local_user_by_username(username):
+def _application_user_by_username(username):
     matches = (
         User.query.filter(func.lower(User.username) == username.strip().lower())
         .limit(2)
@@ -89,40 +81,18 @@ def _local_user_by_username(username):
     return (matches[0] if matches else None), False
 
 
-def _ldap_user_for_login(username, password, known_local_user=None):
+def _ldap_user_for_login(user, password):
     if not current_app.config.get("LDAP_ENABLED"):
-        if known_local_user is not None:
-            raise DirectoryUnavailable("LDAP authentication is not enabled")
-        return None
+        raise DirectoryUnavailable("LDAP authentication is not enabled")
 
     directory = get_ldap_directory()
-    if known_local_user is not None:
-        if known_local_user.directory_key != directory.directory_key:
-            raise DirectoryUnavailable("Provisioned directory is not configured")
-        identity = directory.find_by_subject(known_local_user.directory_subject)
-        user = known_local_user
-    else:
-        identity = directory.find_by_login(username)
-        if identity is None:
-            return None
-        user = User.query.filter_by(
-            auth_provider="LDAP",
-            directory_key=identity.directory_key,
-            directory_subject=identity.subject,
-        ).first()
-        if user is None:
-            return None
-
-    if not user.is_active:
-        return None
+    if user.directory_key != directory.directory_key:
+        raise DirectoryUnavailable("Provisioned directory is not configured")
+    identity = directory.find_by_subject(user.directory_subject)
     if identity is None:
         return None
-    if (
-        known_local_user is not None
-        and identity.username.casefold() != username.casefold()
-    ):
-        # Do not keep accepting an old directory username after rename/reuse.
-        # The next attempt with the new directory login resolves by stable ID.
+    if identity.username.casefold() != user.username.casefold():
+        # Directory username changes must be synchronized before login.
         return None
     if (
         identity.directory_key != user.directory_key
@@ -132,8 +102,6 @@ def _ldap_user_for_login(username, password, known_local_user=None):
     if identity.is_enabled is False:
         return None
 
-    # A discovered directory identity must correspond to this already
-    # provisioned LDAP account. Never authenticate it through LOCAL.
     directory.authenticate(identity, password)
 
     collision = User.query.filter(
@@ -199,60 +167,27 @@ def login():
         return _invalid_credentials()
     username = username.strip()
 
-    user, ambiguous = _local_user_by_username(username)
-    if ambiguous:
+    user, ambiguous = _application_user_by_username(username)
+    if ambiguous or user is None or not user.is_active:
         return _invalid_credentials()
-    if not request.is_secure and not current_app.config.get("TESTING"):
-        return _https_required()
-    if user is not None:
-        if not user.is_active:
+
+    if user.auth_provider == "LOCAL":
+        if not user.check_password(password):
             return _invalid_credentials()
-        if user.auth_provider == "LOCAL":
-            if not user.check_password(password):
-                return _invalid_credentials()
-        elif user.auth_provider == "LDAP":
-            if not user.directory_subject:
-                return _invalid_credentials()
-            try:
-                user = _ldap_user_for_login(
-                    username,
-                    password,
-                    known_local_user=user,
-                )
-            except DirectoryInvalidCredentials:
-                return _invalid_credentials()
-            except DirectoryIdentityNotFound:
-                return _invalid_credentials()
-            except DirectoryUnavailable:
-                current_app.logger.warning("LDAP provider unavailable during login")
-                return _provider_unavailable()
-            except DirectoryAmbiguousIdentity:
-                return _invalid_credentials()
-            except IntegrityError:
-                db.session.rollback()
-                return _invalid_credentials()
-            except Exception:
-                db.session.rollback()
-                current_app.logger.warning(
-                    "LDAP login/profile synchronization failed"
-                )
-                return _provider_unavailable()
-            if user is None:
-                return _invalid_credentials()
-        else:
+    elif user.auth_provider == "LDAP":
+        if not user.directory_subject:
             return _invalid_credentials()
-    else:
         try:
-            user = _ldap_user_for_login(username, password)
-        except DirectoryInvalidCredentials:
-            return _invalid_credentials()
-        except DirectoryIdentityNotFound:
+            user = _ldap_user_for_login(user, password)
+        except (
+            DirectoryInvalidCredentials,
+            DirectoryIdentityNotFound,
+            DirectoryAmbiguousIdentity,
+        ):
             return _invalid_credentials()
         except DirectoryUnavailable:
             current_app.logger.warning("LDAP provider unavailable during login")
             return _provider_unavailable()
-        except DirectoryAmbiguousIdentity:
-            return _invalid_credentials()
         except IntegrityError:
             db.session.rollback()
             return _invalid_credentials()
@@ -262,6 +197,8 @@ def login():
             return _provider_unavailable()
         if user is None:
             return _invalid_credentials()
+    else:
+        return _invalid_credentials()
 
     if user.role not in VALID_ROLES:
         return auth_error(
