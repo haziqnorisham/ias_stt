@@ -3,6 +3,8 @@
 This module owns all directory I/O. It never issues JWTs, reads password
 attributes, assigns application roles, or contacts LDAP during API JWT checks.
 """
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import ssl
@@ -166,7 +168,9 @@ class LDAPDirectory:
                 receive_timeout=int(self.config.get("LDAP_RECEIVE_TIMEOUT", 5)),
                 raise_exceptions=False,
             )
-            if not connection.open():
+            # ldap3.open() returns None; inspect the connection state instead.
+            connection.open()
+            if connection.closed:
                 raise DirectoryUnavailable("Unable to connect to LDAP")
             if starttls and not connection.start_tls():
                 raise DirectoryUnavailable("Unable to establish LDAP TLS")

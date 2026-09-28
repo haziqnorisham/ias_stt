@@ -543,7 +543,8 @@ class LDAPDirectoryTransportTest(unittest.TestCase):
                     patch("ldap3.Connection") as connection_factory,
                 ):
                     connection = Mock()
-                    connection.open.return_value = True
+                    connection.open.return_value = None
+                    connection.closed = False
                     connection.bind.return_value = True
                     connection_factory.return_value = connection
 
@@ -587,7 +588,8 @@ class LDAPDirectoryTransportTest(unittest.TestCase):
                     LDAP_STARTTLS=starttls,
                 )
                 connection = Mock()
-                connection.open.return_value = True
+                connection.open.return_value = None
+                connection.closed = False
                 connection.start_tls.return_value = True
                 connection.bind.return_value = True
                 connection_factory.return_value = connection
@@ -614,7 +616,8 @@ class LDAPDirectoryTransportTest(unittest.TestCase):
     def test_configured_starttls_failure_does_not_bind_in_plaintext(self):
         config = dict(self.config, LDAP_STARTTLS=True)
         connection = Mock()
-        connection.open.return_value = True
+        connection.open.return_value = None
+        connection.closed = False
         connection.start_tls.return_value = False
         with (
             patch("ldap3.Tls"),
