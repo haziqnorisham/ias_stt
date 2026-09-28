@@ -6,6 +6,7 @@ import uuid
 
 from flask import Blueprint, current_app, g, jsonify, request, send_file
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
 from app.auth import (
@@ -233,6 +234,42 @@ def delete_action_type(action_type_id):
 # ---------------------------------------------------------------------------
 # Immutable deployment actions
 # ---------------------------------------------------------------------------
+@deployment_actions_bp.route("/deployment-actions", methods=["GET"])
+@require_permission("deployments:read")
+def list_recent_deployment_actions():
+    raw_limit = request.args.get("limit", "20")
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return _error("'limit' must be an integer", 400)
+
+    if limit < 1 or limit > 100:
+        return _error("'limit' must be between 1 and 100", 400)
+
+    actions = (
+        DeploymentAction.query
+        .options(
+            joinedload(DeploymentAction.deployment).joinedload(Deployment.trap),
+            joinedload(DeploymentAction.action_type),
+        )
+        .order_by(
+            DeploymentAction.performed_at.desc(),
+            DeploymentAction.id.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+    result = []
+    for action in actions:
+        item = action.to_dict()
+        trap = action.deployment.trap
+        item["trap"] = {"id": trap.id, "trap_id": trap.trap_id}
+        result.append(item)
+
+    return jsonify(result), 200
+
+
 @deployment_actions_bp.route(
     "/deployments/<int:dep_id>/actions", methods=["GET"]
 )

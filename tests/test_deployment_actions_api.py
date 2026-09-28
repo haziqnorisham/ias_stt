@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import time
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from app import create_app
 from app.config import Config
@@ -109,6 +110,19 @@ class DeploymentActionsApiTest(unittest.TestCase):
             headers=headers,
             content_type="multipart/form-data",
         )
+
+    def _add_feed_action(self, deployment, action_type, performed_at, username):
+        action = DeploymentAction(
+            deployment_id=deployment.id,
+            action_type_id=action_type.id,
+            picture_url="feed-test.jpg",
+            picture_filename="feed-test.jpg",
+            performed_at=performed_at,
+            performed_by=username,
+        )
+        db.session.add(action)
+        db.session.flush()
+        return action
 
     def test_seeded_action_types_are_available_to_authenticated_readers(self):
         headers = self._login("operator", "operator-password")
@@ -318,6 +332,98 @@ class DeploymentActionsApiTest(unittest.TestCase):
         self.assertEqual(deleted.status_code, 200)
         self.assertIsNone(db.session.get(DeploymentAction, action_id))
         self.assertFalse(os.path.exists(stored_path))
+
+    def test_recent_actions_include_closed_deployments_and_order_ties_by_id(self):
+        headers = self._login("viewer", "viewer-password")
+        action_type = DeploymentActionType.query.filter_by(code="bait_added").one()
+        closed_trap = Trap(
+            status="inactive",
+            trap_id="TRAP-CLOSED-002",
+            tracker_id="",
+            updated_by="system",
+        )
+        db.session.add(closed_trap)
+        db.session.flush()
+        closed_deployment = Deployment(trap_id=closed_trap.id, status="closed")
+        db.session.add(closed_deployment)
+        self.deployment.status = "closed"
+        db.session.flush()
+
+        now = datetime.now(timezone.utc)
+        older = self._add_feed_action(
+            self.deployment, action_type, now - timedelta(minutes=10), "mali"
+        )
+        tied_first = self._add_feed_action(
+            self.deployment, action_type, now, "operator"
+        )
+        tied_second = self._add_feed_action(
+            closed_deployment, action_type, now, "mhaziq"
+        )
+        db.session.commit()
+
+        response = self.client.get("/api/deployment-actions", headers=headers)
+
+        self.assertEqual(response.status_code, 200)
+        actions = response.get_json()
+        self.assertEqual(
+            [action["id"] for action in actions],
+            [tied_second.id, tied_first.id, older.id],
+        )
+        self.assertEqual(actions[0]["trap"], {
+            "id": closed_trap.id,
+            "trap_id": "TRAP-CLOSED-002",
+        })
+        self.assertEqual(actions[0]["action_type"]["label"], action_type.label)
+        self.assertEqual(actions[0]["performed_by"], "mhaziq")
+
+    def test_recent_actions_limit_defaults_to_20_and_validates_range(self):
+        headers = self._login("operator", "operator-password")
+        action_type = DeploymentActionType.query.filter_by(code="routine_check").one()
+        now = datetime.now(timezone.utc)
+        created = [
+            self._add_feed_action(
+                self.deployment,
+                action_type,
+                now + timedelta(seconds=index),
+                "operator",
+            )
+            for index in range(21)
+        ]
+        db.session.commit()
+
+        default_limit = self.client.get("/api/deployment-actions", headers=headers)
+        self.assertEqual(default_limit.status_code, 200)
+        self.assertEqual(len(default_limit.get_json()), 20)
+        self.assertEqual(default_limit.get_json()[0]["id"], created[-1].id)
+
+        one_action = self.client.get(
+            "/api/deployment-actions?limit=1", headers=headers
+        )
+        self.assertEqual(one_action.status_code, 200)
+        self.assertEqual(len(one_action.get_json()), 1)
+
+        maximum_limit = self.client.get(
+            "/api/deployment-actions?limit=100", headers=headers
+        )
+        self.assertEqual(maximum_limit.status_code, 200)
+        self.assertEqual(len(maximum_limit.get_json()), 21)
+
+        for invalid_limit in ("abc", "0", "101", "-1"):
+            with self.subTest(limit=invalid_limit):
+                response = self.client.get(
+                    f"/api/deployment-actions?limit={invalid_limit}",
+                    headers=headers,
+                )
+                self.assertEqual(response.status_code, 400)
+
+    def test_recent_actions_requires_auth_and_returns_an_empty_array(self):
+        unauthorized = self.client.get("/api/deployment-actions")
+        self.assertEqual(unauthorized.status_code, 401)
+
+        headers = self._login("viewer", "viewer-password")
+        response = self.client.get("/api/deployment-actions", headers=headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), [])
 
 
 if __name__ == "__main__":
