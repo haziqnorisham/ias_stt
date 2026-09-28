@@ -875,6 +875,53 @@ paths:
         404:
           $ref: '#/components/responses/404'
 
+  /api/deployments/outdated-summary:
+    get:
+      tags: [Deployments]
+      summary: Get active and outdated deployment counts
+      operationId: getOutdatedDeploymentSummary
+      description: |
+        Counts active deployments and those with no recorded action in more
+        than 12 hours. The most recent deployment action controls the age. If
+        there are no actions, the deployment start date is used, falling back
+        to its creation date. Editing deployment details does not reset the
+        timer. Deployments without any available timestamp count as active but
+        are excluded from the outdated count.
+      responses:
+        200:
+          description: Current active and outdated deployment counts
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - active_deployment_count
+                  - outdated_deployment_count
+                  - threshold_hours
+                  - as_of
+                properties:
+                  active_deployment_count:
+                    type: integer
+                    minimum: 0
+                  outdated_deployment_count:
+                    type: integer
+                    minimum: 0
+                  threshold_hours:
+                    type: integer
+                    enum: [12]
+                  as_of:
+                    type: string
+                    format: date-time
+              example:
+                active_deployment_count: 2
+                outdated_deployment_count: 1
+                threshold_hours: 12
+                as_of: '2026-09-28T15:00:00+08:00'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+
   /api/deployments/{deployment_id}:
     parameters:
       - name: deployment_id

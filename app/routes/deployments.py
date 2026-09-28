@@ -42,6 +42,12 @@ def list_deployments():
     return jsonify([d.to_dict() for d in deps]), 200
 
 
+@deployments_bp.route("/deployments/outdated-summary", methods=["GET"])
+@require_permission("deployments:read")
+def outdated_deployment_summary():
+    return jsonify(deployment_service.get_outdated_deployment_summary()), 200
+
+
 @deployments_bp.route("/deployments/<int:dep_id>", methods=["GET"])
 @require_permission("deployments:read")
 def get_deployment(dep_id):
