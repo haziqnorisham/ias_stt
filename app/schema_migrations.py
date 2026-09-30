@@ -17,6 +17,29 @@ def upgrade_schema(engine):
                     text("ALTER TABLE traps ADD COLUMN asset_number VARCHAR(100)")
                 )
 
+    if "smart_trap_tracker" in tables:
+        tracker_columns = {
+            column["name"]
+            for column in inspector.get_columns("smart_trap_tracker")
+        }
+        additions = {
+            "temperature": "FLOAT",
+            "temperature_received_at": (
+                "TIMESTAMP WITH TIME ZONE"
+                if engine.dialect.name == "postgresql"
+                else "DATETIME"
+            ),
+        }
+        with engine.begin() as connection:
+            for name, definition in additions.items():
+                if name not in tracker_columns:
+                    connection.execute(
+                        text(
+                            f"ALTER TABLE smart_trap_tracker "
+                            f"ADD COLUMN {name} {definition}"
+                        )
+                    )
+
     if "users" not in tables:
         return
 

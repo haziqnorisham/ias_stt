@@ -386,7 +386,9 @@ paths:
         (optional) MQTT path: `deviceInfo.devEui` is looked up in the
         trackers table; unknown devices are silently ignored (still
         `200`). `object.latitude`, `object.longitude`,
-        `object.position`, and `object.battery` update the tracker,
+        `object.position`, `object.battery`, and a finite numeric
+        `object.temperature` (Celsius) update the tracker. Temperature is
+        retained when later uplinks omit it or supply an invalid value,
         and the geofence/deployment logic runs when coordinates are
         present.
       operationId: telemetryIngest
@@ -405,6 +407,7 @@ paths:
                 longitude: 36.8219
                 position: normal
                 battery: 95
+                temperature: 23.5
       responses:
         200:
           description: Payload accepted and processed (unknown devEui included)
@@ -429,7 +432,8 @@ paths:
       description: |
         Returns persisted uplinks from registered tracker devices, newest
         first. The raw payload is excluded from list results; use the detail
-        endpoint to retrieve it.
+        endpoint to retrieve it. Each row's nullable `temperature` is parsed
+        from `object.temperature` in its stored decoded payload (Celsius).
       operationId: listUplinks
       parameters:
         - $ref: '#/components/parameters/limit'
@@ -653,6 +657,63 @@ paths:
           $ref: '#/components/responses/404'
 
   # -- Trackers ---------------------------------------------------------------
+  /api/stt:
+    get:
+      tags: [Trackers]
+      summary: List registered trackers and their latest temperatures
+      operationId: listTrackers
+      description: |
+        Requires `trackers:read`. `temperature` is the latest valid Celsius
+        reading received from the tracker; `temperature_received_at` is its
+        server receipt time. Both are null until a reading is available.
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/offset'
+        - name: device_eui
+          in: query
+          schema: { type: string, maxLength: 100 }
+          description: Filter by tracker device EUI
+      responses:
+        200:
+          description: Registered trackers ordered by ID
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SmartTrapTracker'
+        400:
+          $ref: '#/components/responses/400'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+
+  /api/stt/{tracker_pk}:
+    get:
+      tags: [Trackers]
+      summary: Get one registered tracker
+      operationId: getTracker
+      description: Requires `trackers:read`.
+      parameters:
+        - name: tracker_pk
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Tracker including its latest temperature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmartTrapTracker'
+        401:
+          $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
+        404:
+          $ref: '#/components/responses/404'
+
   /api/stt/unassigned:
     get:
       tags: [Trackers]
@@ -1521,6 +1582,7 @@ components:
             longitude:   { type: number, format: float }
             position:    { type: string, description: Mapped to tracker tilt_status. }
             battery:     { type: integer }
+            temperature: { type: number, format: float, description: Celsius; only finite numeric readings are applied. }
       required: [deviceInfo]
 
     SmartTrapTracker:
@@ -1533,6 +1595,8 @@ components:
         longitude:     { type: number, format: float, nullable: true }
         tilt_status:   { type: string, maxLength: 50, nullable: true }
         battery:       { type: integer, nullable: true }
+        temperature:   { type: number, format: float, nullable: true, readOnly: true, description: Latest valid Celsius reading. }
+        temperature_received_at: { type: string, format: date-time, nullable: true, readOnly: true, description: Server receipt time of the temperature reading. }
         created_date:  { type: string, format: date-time, nullable: true }
         updated_date:  { type: string, format: date-time, nullable: true }
       required: [id, device_eui]
@@ -1550,6 +1614,7 @@ components:
         longitude:    { type: number, format: float, nullable: true }
         tilt_status:  { type: string, nullable: true }
         battery:      { type: integer, nullable: true }
+        temperature:  { type: number, format: float, nullable: true, description: Finite Celsius reading from the stored decoded payload. }
       required: [id, device_eui, received_at, source]
 
     TrackerUplinkDetail:

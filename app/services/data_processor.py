@@ -8,6 +8,7 @@ from app.models.database import db
 from app.models.server_configuration import server_configuration
 from app.models.smart_trap_tracker import SmartTrapTracker
 from app.models.tracker_uplink import TrackerUplink
+from app.services.tracker_temperature import parse_temperature
 
 logger = logging.getLogger("app.data_processor")
 
@@ -16,6 +17,7 @@ FIELD_MAP = {
     "longitude": "longitude",
     "position": "tilt_status",
     "battery": "battery",
+    "temperature": "temperature",
 }
 
 
@@ -33,7 +35,7 @@ def device_exists(dev_eui):
         return False
 
 
-def _apply_inbound_update(data, dev_eui):
+def _apply_inbound_update(data, dev_eui, received_at):
     """Map sensor keys from ``data['object']`` to tracker columns and persist.
 
     Only keys that are actually present in the payload are applied.  Unknown
@@ -47,7 +49,8 @@ def _apply_inbound_update(data, dev_eui):
         return
     
     updates = _parse_sensor_updates(data)
-    if not updates:
+    temperature = updates.pop("temperature", None)
+    if not updates and temperature is None:
         return
 
     latitude = updates.get("latitude")
@@ -67,6 +70,12 @@ def _apply_inbound_update(data, dev_eui):
             and updates["tilt_status"] == "normal"
         ):
             _notify_trap_closed(dev_eui)
+
+    if temperature is not None:
+        SmartTrapTracker.update_temperature_by_device_eui(
+            dev_eui, temperature, received_at
+        )
+        logger.info("Updated temperature for tracker %s", dev_eui)
 
     logger.info("Before geofence check for device %s", dev_eui)
     if latitude is not None and longitude is not None:
@@ -242,6 +251,10 @@ def _parse_sensor_updates(data):
                 value = float(value)
             except (ValueError, TypeError):
                 continue
+        elif column == "temperature":
+            value = parse_temperature(value)
+            if value is None:
+                continue
         updates[column] = value
     return updates
 
@@ -268,6 +281,7 @@ def _store_uplink(data, dev_eui, topic, payload, source):
         dev_eui,
         source,
     )
+    return uplink.received_at
 
 
 def process_message(topic, payload, source="mqtt"):
@@ -298,8 +312,8 @@ def process_message(topic, payload, source="mqtt"):
         known = device_exists(dev_eui)
         logger.info("device_exists('%s') → %s", dev_eui, known)
         if known:
-            _store_uplink(data, dev_eui, topic, payload, source)
-            _apply_inbound_update(data, dev_eui)
+            received_at = _store_uplink(data, dev_eui, topic, payload, source)
+            _apply_inbound_update(data, dev_eui, received_at)
     else:
         logger.warning(
             "deviceEui not found in payload on topic '%s'", topic

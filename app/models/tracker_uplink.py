@@ -1,4 +1,5 @@
 """Historical decoded uplinks received from registered tracker devices."""
+import json
 from datetime import datetime, timezone
 
 from app.models.database import db
@@ -34,6 +35,19 @@ class TrackerUplink(db.Model):
     )
 
     def to_dict(self, include_raw=False, display_name=None):
+        # The original decoded payload already holds historical temperatures.
+        # Parse only the requested page, without adding another database field.
+        try:
+            payload = json.loads(self.raw_payload)
+        except (TypeError, ValueError):
+            payload = None
+        obj = payload.get("object") if isinstance(payload, dict) else None
+        temperature = None
+        if isinstance(obj, dict):
+            from app.services.tracker_temperature import parse_temperature
+
+            temperature = parse_temperature(obj.get("temperature"))
+
         result = {
             "id": self.id,
             "device_eui": self.device_eui,
@@ -47,6 +61,7 @@ class TrackerUplink(db.Model):
             else None,
             "tilt_status": self.tilt_status,
             "battery": self.battery,
+            "temperature": temperature,
         }
         if include_raw:
             result["raw_payload"] = self.raw_payload

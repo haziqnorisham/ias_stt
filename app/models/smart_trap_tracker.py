@@ -1,6 +1,8 @@
 """Smart Trap Tracker model."""
 from datetime import datetime, timezone
 
+from sqlalchemy import or_, update as sa_update
+
 from app.models.database import db
 from app.time_utils import format_app_datetime
 
@@ -19,6 +21,8 @@ class SmartTrapTracker(db.Model):
     longitude = db.Column(db.Numeric(8, 5))
     tilt_status = db.Column(db.String(50))
     battery = db.Column(db.Integer)
+    temperature = db.Column(db.Float)
+    temperature_received_at = db.Column(db.DateTime(timezone=True))
     created_date = db.Column(db.DateTime(timezone=True), default=_utcnow)
     updated_date = db.Column(
         db.DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
@@ -33,6 +37,10 @@ class SmartTrapTracker(db.Model):
             "longitude": float(self.longitude) if self.longitude is not None else None,
             "tilt_status": self.tilt_status,
             "battery": self.battery,
+            "temperature": self.temperature,
+            "temperature_received_at": format_app_datetime(
+                self.temperature_received_at
+            ),
             "created_date": format_app_datetime(self.created_date),
             "updated_date": format_app_datetime(self.updated_date),
         }
@@ -74,3 +82,30 @@ class SmartTrapTracker(db.Model):
         with get_engine().connect() as conn:
             conn.execute(stmt)
             conn.commit()
+
+    @classmethod
+    def update_temperature_by_device_eui(
+        cls, device_eui, temperature, received_at, *, touch_updated_date=True
+    ):
+        """Store a reading only when it is newer than the current reading."""
+        from app.models.database import get_engine
+
+        values = {
+            "temperature": temperature,
+            "temperature_received_at": received_at,
+            # Backfilling old readings must not make the tracker look freshly updated.
+            "updated_date": _utcnow() if touch_updated_date else cls.updated_date,
+        }
+        stmt = (
+            sa_update(cls)
+            .where(cls.device_eui == device_eui)
+            .where(
+                or_(
+                    cls.temperature_received_at.is_(None),
+                    cls.temperature_received_at < received_at,
+                )
+            )
+            .values(**values)
+        )
+        with get_engine().begin() as conn:
+            return conn.execute(stmt).rowcount

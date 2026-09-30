@@ -1,4 +1,4 @@
-"""Flask CLI commands for managing local users."""
+"""Flask CLI commands for application maintenance."""
 import click
 from sqlalchemy import func
 
@@ -8,6 +8,14 @@ from app.models.user import User
 
 
 def register_cli(app):
+    @app.cli.command("backfill-tracker-temperatures")
+    def backfill_tracker_temperatures():
+        """Restore latest tracker temperatures from stored uplinks."""
+        from app.services.tracker_temperature import backfill_tracker_temperatures
+
+        count = backfill_tracker_temperatures()
+        click.echo(f"Restored temperatures for {count} trackers.")
+
     @app.cli.command("create-user")
     @click.argument("username")
     @click.option("--role", type=click.Choice(VALID_ROLES), required=True)

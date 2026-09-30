@@ -165,7 +165,9 @@ integration**. The body must be the standard ChirpStack JSON envelope
    are silently ignored** and the endpoint still returns `200` (matching the
    former MQTT behaviour).
 2. `object.latitude` / `object.longitude` / `object.position` / `object.battery`
-   are persisted to the tracker row.
+   are persisted to the tracker row. A finite numeric `object.temperature`
+   updates the latest tracker temperature in °C; uplinks without a valid
+   temperature leave the previous reading intact.
 3. The geofence check and deployment/trap-status logic run when coordinates
    are present.
 
@@ -188,7 +190,7 @@ curl -X POST http://localhost:5000/api/telemetry/ingest \
   -H 'Content-Type: application/json' \
   -d '{
     "deviceInfo": { "devEui": "a1b2c3d4e5f6a7b8", "deviceName": "trap-tracker-01" },
-    "object": { "latitude": -1.2921, "longitude": 36.8219, "position": "normal", "battery": 95 }
+    "object": { "latitude": -1.2921, "longitude": 36.8219, "position": "normal", "battery": 95, "temperature": 23.5 }
   }'
 # -> 200 {"status": "processed"}
 ```
@@ -218,6 +220,8 @@ logs. The list endpoint excludes it to keep responses compact; the detail
 endpoint and the **View** action on `/uplinks` expose it on demand. There is no
 automatic retention cleanup, so the `tracker_uplinks` table will grow with each
 received uplink.
+The history API derives a nullable Celsius `temperature` from each stored
+payload's `object.temperature` field without a separate database column.
 
 ### Endpoints
 
@@ -228,6 +232,24 @@ received uplink.
 
 The SB Admin 2-style `/uplinks` page provides tracker/source filters,
 pagination, refresh, and an uplink detail modal.
+
+## Latest tracker temperatures
+
+`GET /api/stt` and `GET /api/stt/<id>` include `temperature` (°C) and
+`temperature_received_at` (the server receipt time of that reading). Both are
+null until a valid temperature arrives. These fields describe the tracker
+sensor and are separate from the editable `traps.temperature` value.
+
+After deploying this backend update to an existing database, restore the
+latest valid reading from each tracker's stored raw uplinks before releasing
+the tracker page update:
+
+```bash
+flask --app run.py backfill-tracker-temperatures
+```
+
+The command is safe to repeat. It does not change a tracker's general
+`updated_date` or replace a newer reading received during the backfill.
 
 ## Unassigned trackers API (`/api/stt/unassigned`)
 
