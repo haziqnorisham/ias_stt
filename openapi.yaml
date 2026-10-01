@@ -810,6 +810,7 @@ paths:
     get:
       tags: [Traps]
       summary: Get a trap by ID
+      description: Requires the `traps:read` permission.
       operationId: getTrap
       responses:
         200:
@@ -820,6 +821,8 @@ paths:
                 $ref: '#/components/schemas/Trap'
         401:
           $ref: '#/components/responses/401'
+        403:
+          $ref: '#/components/responses/403'
         404:
           $ref: '#/components/responses/404'
 

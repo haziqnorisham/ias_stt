@@ -134,6 +134,30 @@ class JwtAuthApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.get_json()["error"]["code"], "FORBIDDEN")
 
+    def test_trap_detail_uses_trap_read_permission(self):
+        for username, password in (
+            ("admin", "admin-password"),
+            ("operator", "operator-password"),
+            ("viewer", "viewer-password"),
+        ):
+            with self.subTest(username=username):
+                body = self._login(username, password)
+                response = self.client.get(
+                    f"/api/traps/{self.trap_id}",
+                    headers=self._auth(body["access_token"]),
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.get_json()["id"], self.trap_id)
+
+        unauthenticated = self.client.get(f"/api/traps/{self.trap_id}")
+        self.assertEqual(unauthenticated.status_code, 401)
+
+        missing = self.client.get(
+            "/api/traps/999999",
+            headers=self._auth(self._login("operator", "operator-password")["access_token"]),
+        )
+        self.assertEqual(missing.status_code, 404)
+
     def test_operator_update_ignores_client_updated_by(self):
         body = self._login("operator", "operator-password")
 

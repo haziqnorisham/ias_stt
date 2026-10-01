@@ -102,7 +102,7 @@ def list_traps():
 
 
 @traps_bp.route("/<int:trap_pk>", methods=["GET"])
-@require_permission("trap_details:read")
+@require_permission("traps:read")
 def get_trap(trap_pk):
     trap = db.session.get(Trap, trap_pk)
     if trap is None:
