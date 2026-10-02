@@ -251,6 +251,26 @@ flask --app run.py backfill-tracker-temperatures
 The command is safe to repeat. It does not change a tracker's general
 `updated_date` or replace a newer reading received during the backfill.
 
+## Latest tracker signal strength
+
+The tracker APIs (`/api/stt`, `/api/stt/<id>`, and `/api/stt/unassigned`)
+include read-only `rssi` (dBm) and `rssi_received_at`. The trap list, detail,
+and save responses include the assigned tracker's equivalent fields as
+`tracker_rssi` and `tracker_rssi_received_at`, under the existing trap
+permissions.
+
+RSSI is derived from the newest stored HTTP or MQTT message, ordered by
+server receipt time and then uplink ID. When multiple gateways received a
+message, the strongest finite numeric `rxInfo[].rssi` is used (`rx_info` is
+also accepted). A newest message without RSSI returns null rather than an
+older reading. The receipt time still identifies that newest message; both
+fields are null when no stored message exists. Uplink list/detail responses
+also expose the RSSI for that individual message.
+
+Only each requested tracker's newest payload is fetched, in one batch
+query per result page. Existing stored messages work immediately; no schema
+upgrade or backfill is required. Deploy the backend before the UI update.
+
 ## Unassigned trackers API (`/api/stt/unassigned`)
 
 `GET /api/stt/unassigned` returns registered smart trap trackers that are not

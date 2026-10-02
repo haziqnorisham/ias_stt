@@ -8,6 +8,7 @@ from app.auth import current_actor, require_permission
 from app.models.database import db
 from app.models.trap import Trap
 from app.services import deployment_service
+from app.services.tracker_signal import add_latest_rssi
 
 traps_bp = Blueprint("traps", __name__, url_prefix="/api/traps")
 
@@ -98,7 +99,9 @@ def list_traps():
         query = query.filter(Trap.status == status)
 
     traps = query.order_by(Trap.id).limit(limit).offset(offset).all()
-    return jsonify([t.to_dict() for t in traps]), 200
+    return jsonify(add_latest_rssi(
+        [t.to_dict() for t in traps], device_eui_field="tracker_id", prefix="tracker_"
+    )), 200
 
 
 @traps_bp.route("/<int:trap_pk>", methods=["GET"])
@@ -107,7 +110,9 @@ def get_trap(trap_pk):
     trap = db.session.get(Trap, trap_pk)
     if trap is None:
         return _error("Trap not found", 404)
-    return jsonify(trap.to_dict()), 200
+    return jsonify(add_latest_rssi(
+        [trap.to_dict()], device_eui_field="tracker_id", prefix="tracker_"
+    )[0]), 200
 
 
 @traps_bp.route("", methods=["POST"])
@@ -145,7 +150,9 @@ def create_trap():
         current_app.logger.exception("Failed to create trap")
         return _error("Internal Server Error", 500)
 
-    return jsonify(trap.to_dict()), 201
+    return jsonify(add_latest_rssi(
+        [trap.to_dict()], device_eui_field="tracker_id", prefix="tracker_"
+    )[0]), 201
 
 
 @traps_bp.route("/<int:trap_pk>", methods=["PUT"])
@@ -205,7 +212,9 @@ def update_trap(trap_pk):
         current_app.logger.exception("Failed to update trap %s", trap_pk)
         return _error("Internal Server Error", 500)
 
-    return jsonify(trap.to_dict()), 200
+    return jsonify(add_latest_rssi(
+        [trap.to_dict()], device_eui_field="tracker_id", prefix="tracker_"
+    )[0]), 200
 
 
 @traps_bp.route("/<int:trap_pk>", methods=["DELETE"])

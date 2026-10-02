@@ -63,6 +63,9 @@ class TrackerUplink(db.Model):
             "battery": self.battery,
             "temperature": temperature,
         }
+        from app.services.tracker_signal import parse_uplink_rssi
+
+        result["rssi"] = parse_uplink_rssi(payload)
         if include_raw:
             result["raw_payload"] = self.raw_payload
         return result

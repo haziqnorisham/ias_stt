@@ -9,6 +9,7 @@ from app.auth import require_permission
 from app.models.database import db
 from app.models.smart_trap_tracker import SmartTrapTracker
 from app.models.trap import Trap
+from app.services.tracker_signal import add_latest_rssi
 
 trackers_bp = Blueprint("trackers", __name__, url_prefix="/api/stt")
 
@@ -118,7 +119,7 @@ def list_trackers():
     trackers = (
         query.order_by(SmartTrapTracker.id).limit(limit).offset(offset).all()
     )
-    return jsonify([t.to_dict() for t in trackers]), 200
+    return jsonify(add_latest_rssi([t.to_dict() for t in trackers])), 200
 
 
 @trackers_bp.route("/unassigned", methods=["GET"])
@@ -141,7 +142,7 @@ def list_unassigned_trackers():
         .offset(offset)
     )
     trackers = db.session.execute(stmt).scalars().all()
-    return jsonify([tracker.to_dict() for tracker in trackers]), 200
+    return jsonify(add_latest_rssi([tracker.to_dict() for tracker in trackers])), 200
 
 
 @trackers_bp.route("/<int:tracker_pk>", methods=["GET"])
@@ -150,7 +151,7 @@ def get_tracker(tracker_pk):
     tracker = db.session.get(SmartTrapTracker, tracker_pk)
     if tracker is None:
         return _error("Tracker not found", 404)
-    return jsonify(tracker.to_dict()), 200
+    return jsonify(add_latest_rssi([tracker.to_dict()])[0]), 200
 
 
 @trackers_bp.route("", methods=["POST"])
@@ -186,7 +187,7 @@ def create_tracker():
         current_app.logger.exception("Failed to create tracker")
         return _error("Internal Server Error", 500)
 
-    return jsonify(tracker.to_dict()), 201
+    return jsonify(add_latest_rssi([tracker.to_dict()])[0]), 201
 
 
 @trackers_bp.route("/<int:tracker_pk>", methods=["PUT"])
@@ -232,7 +233,7 @@ def update_tracker(tracker_pk):
 
         notify_if_trap_closed(tracker.device_eui)
 
-    return jsonify(tracker.to_dict()), 200
+    return jsonify(add_latest_rssi([tracker.to_dict()])[0]), 200
 
 
 @trackers_bp.route("/<int:tracker_pk>", methods=["DELETE"])

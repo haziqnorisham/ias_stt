@@ -1573,6 +1573,14 @@ components:
       type: object
       description: ChirpStack decoded uplink envelope.
       properties:
+        rxInfo:
+          type: array
+          description: Gateway reception metadata. Signal strength uses the strongest finite numeric RSSI from the newest stored inbound message.
+          items:
+            type: object
+            properties:
+              gatewayId: { type: string }
+              rssi: { type: number, description: Received signal strength in dBm. }
         deviceInfo:
           type: object
           properties:
@@ -1600,6 +1608,8 @@ components:
         battery:       { type: integer, nullable: true }
         temperature:   { type: number, format: float, nullable: true, readOnly: true, description: Latest valid Celsius reading. }
         temperature_received_at: { type: string, format: date-time, nullable: true, readOnly: true, description: Server receipt time of the temperature reading. }
+        rssi: { type: number, nullable: true, readOnly: true, description: Strongest gateway RSSI in dBm from the newest stored inbound message; null if that message has no finite numeric RSSI. Does not fall back to older readings. }
+        rssi_received_at: { type: string, format: date-time, nullable: true, readOnly: true, description: Server receipt time of the newest stored inbound message; null if there is no stored message. }
         created_date:  { type: string, format: date-time, nullable: true }
         updated_date:  { type: string, format: date-time, nullable: true }
       required: [id, device_eui]
@@ -1618,6 +1628,7 @@ components:
         tilt_status:  { type: string, nullable: true }
         battery:      { type: integer, nullable: true }
         temperature:  { type: number, format: float, nullable: true, description: Finite Celsius reading from the stored decoded payload. }
+        rssi: { type: number, nullable: true, readOnly: true, description: Strongest finite numeric gateway RSSI in dBm derived from this stored payload. }
       required: [id, device_eui, received_at, source]
 
     TrackerUplinkDetail:
@@ -1686,6 +1697,8 @@ components:
         trap_id:           { type: string, maxLength: 50 }
         asset_number:      { type: string, maxLength: 100, nullable: true }
         tracker_id:        { type: string, maxLength: 50 }
+        tracker_rssi: { type: number, nullable: true, readOnly: true, description: Assigned tracker RSSI in dBm from its newest stored inbound message; same rule as SmartTrapTracker.rssi. }
+        tracker_rssi_received_at: { type: string, format: date-time, nullable: true, readOnly: true, description: Receipt time of the assigned tracker newest stored message; null if no assigned tracker or message exists. }
         location:          { type: string, maxLength: 50, nullable: true }
         door_status:       { type: string, maxLength: 20, nullable: true }
         temperature:       { type: number, format: float, nullable: true }
